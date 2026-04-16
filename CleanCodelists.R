@@ -12,48 +12,59 @@ headings <- read_delim("F:\\Users\\0631736\\New codelists\\anal_fissures.txt", d
 NewVariables <- names(headings)
 rm(headings)
 
-diabetes <- read_delim("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Scripts\\Codelists\\diabetes_codelist.txt", delim = "\t") 
 
-### A somewhat standardized script that can be used for any codelist ###
+### Codelist generation by disease
 
-disease <- diabetes
+      ### For diabetes
 
-idtype <- "MedCodeId"
-
-CodelistCleaner <- function(disease, idtype) {
+      OriginalFile <- read_delim("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\diabetes_codelist.txt", delim = "\t")
   
-  medcode <- variable.names(disease)[1]
+      LinkedToAurum <- inner_join(OriginalFile, codebrowser, by = c("medcode" = "MedCodeId"), keep = TRUE, suffix = c(".og", ""))
   
-  LinkedToAurum <- inner_join(disease, codebrowser, by = c("medcode" = idtype), keep = TRUE, suffix = c(".og", ""))
-  
-  CleanLinkedCodes <- LinkedToAurum %>% 
-    select(MedCodeId, Observations, OriginalReadCode, Term) %>% 
-    relocate(MedCodeId, Observations, OriginalReadCode, Term) %>% 
-    rename_with(~NewVariables, 1:4) %>% 
-    filter(!is.na(clinicalevents)) %>% 
-    distinct(medcode, .keep_all = TRUE)
-  
-  disease <- CleanLinkedCodes
-  
-}
+      CleanLinkedCodes <- LinkedToAurum %>% 
+        select(MedCodeId, Observations, OriginalReadCode, Term) %>% 
+        relocate(MedCodeId, Observations, OriginalReadCode, Term) %>% 
+        rename_with(~NewVariables, 1:4) %>% 
+        filter(!is.na(clinicalevents)) %>% 
+        distinct(medcode, .keep_all = TRUE)
 
-CodelistPrinter <- function(disease){
-  
-  output <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Scripts\\Codelists\\NAME.txt"
-  
-  NEWNAME <- deparse(substitute(disease))
-  
-  output <- str_replace(output, "NAME", NEWNAME)
-  
-  write.table(disease, output, sep = "\t", row.names = FALSE)
+        write.table(CleanLinkedCodes, "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\diabetes.txt", sep = "\t", row.names = FALSE)
 
-}
-
-CodelistCleaner(bph, "MedCodeId")
-
-CodelistCleaner(nephrolithiasis, "SnomedCTConcept")
+        rm(CleanLinkedCodes, LinkedToAurum, OriginalFile)
 
 
+        ### For benign prostate hyperplasia
+        
+        OriginalFile <- read_delim("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\bph_codelist.txt", delim = "\t")
+        
+        LinkedToAurum <- inner_join(OriginalFile, codebrowser, by = c("medcode" = "SnomedCTConceptId"), keep = TRUE, suffix = c(".og", ""))
+        
+        CleanLinkedCodes <- LinkedToAurum %>% 
+          select(MedCodeId, Observations, OriginalReadCode, Term) %>% 
+          relocate(MedCodeId, Observations, OriginalReadCode, Term) %>% 
+          rename_with(~NewVariables, 1:4) %>% 
+          filter(!is.na(clinicalevents)) %>% 
+          distinct(medcode, .keep_all = TRUE)
+        
+        write.table(CleanLinkedCodes, "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\bph.txt", sep = "\t", row.names = FALSE)
+        
+        rm(CleanLinkedCodes, LinkedToAurum)
 
-
+        
+        ### For nephrolithiasis
+        
+        OriginalFile <- read_delim("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\nephrolithiasis_codelist.txt", delim = "\t")
+        
+        LinkedToAurum <- inner_join(OriginalFile, codebrowser, by = c("snowmedid" = "SnomedCTConceptId"), keep = TRUE, suffix = c(".og", ""))
+        
+        CleanLinkedCodes <- LinkedToAurum %>% 
+          select(MedCodeId, Observations, OriginalReadCode, Term) %>% 
+          relocate(MedCodeId, Observations, OriginalReadCode, Term) %>% 
+          rename_with(~NewVariables, 1:4) %>% 
+          filter(!is.na(clinicalevents)) %>% 
+          distinct(medcode, .keep_all = TRUE)
+        
+        write.table(CleanLinkedCodes, "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\nephrolithiasis.txt", sep = "\t", row.names = FALSE)
+        
+        rm(CleanLinkedCodes, LinkedToAurum)
 
