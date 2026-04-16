@@ -1,7 +1,5 @@
 ### Loading packages ###
 
-print("here too!")
-
 library(tidyverse)
 library(readxl)
 options(scipen = 999)
@@ -16,11 +14,8 @@ menopause <- readxl::read_xlsx("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utr
 
 headings <- read_delim("F:\\Users\\0631736\\New codelists\\anal_fissures.txt", delim = "\t") %>% slice(0) %>% select(medcode, clinicalevents, readcode, readterm)
 
-### Sanity check on imported data ###
 
-test <- filter(codebrowser, SnomedCTConceptId == 307429007)
-
-### Codelist generation for paralysis and menopause ###
+### Linking secondary codelists to CPRD Aurum ###
 
 ParalysisSnomedID <- inner_join(paralysis, codebrowser, by = c("code" = "CleansedReadCode"))
 
@@ -36,8 +31,7 @@ MenopauseSnomedID %>% group_by(across(1:1)) %>% count() %>% filter(n > 1)
 ### Clean headings ###
 ### Deleting concepts with no equivalent in CPRD Aurum or Concept ID duplicates ###
 
-
-### does "clinical events" accurately represent "observations", or might "observations" also include referral, test, and immunization events? ###
+### NOTE: does "clinical events" accurately represent "observations", or might "observations" also include referral, test, and immunization events? ###
 
 NewVariables <- names(headings)
 
@@ -55,7 +49,7 @@ NewParalysisSnomedID <- ParalysisSnomedID %>%
   filter(!is.na(clinicalevents)) %>% 
   distinct(medcode, .keep_all = TRUE)
 
-### Outputting code ###
+### Outputting codelists ###
 
 write.table(NewParalysisSnomedID, "paralysis.txt", sep = "\t")
 

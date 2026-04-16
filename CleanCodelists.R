@@ -49,7 +49,9 @@ CodelistPrinter <- function(disease){
 
 }
 
+CodelistCleaner(bph, "MedCodeId")
 
+CodelistCleaner(nephrolithiasis, "SnomedCTConcept")
 
 
 
