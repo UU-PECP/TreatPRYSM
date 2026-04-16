@@ -8,9 +8,9 @@ options(scipen = 999)
 
 codebrowser <- read_delim("F:\\Research Information\\CPRD\\CPRD_CodeBrowser\\CPRD_CodeBrowser_Aurum\\CPRDAurumMedical.txt", delim = "\t")
 
-paralysis <- read.csv("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Scripts\\Codelists\\ParalysisCodes.csv")
+paralysis <- read.csv("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\ParalysisCodes.csv")
   
-menopause <- readxl::read_xlsx("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Scripts\\Codelists\\MenopauseCodes.xlsx")
+menopause <- readxl::read_xlsx("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\MenopauseCodes.xlsx")
 
 headings <- read_delim("F:\\Users\\0631736\\New codelists\\anal_fissures.txt", delim = "\t") %>% slice(0) %>% select(medcode, clinicalevents, readcode, readterm)
 
@@ -51,11 +51,8 @@ NewParalysisSnomedID <- ParalysisSnomedID %>%
 
 ### Outputting codelists ###
 
-write.table(NewParalysisSnomedID, "paralysis.txt", sep = "\t")
-
-
-write.table(NewMenopauseSnomedID, "menopause.txt", sep = "\t")
-
+write.table(NewParalysisSnomedID, "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\paralysis.txt", sep = "\t", row.names = FALSE)
+write.table(NewMenopauseSnomedID, "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\menopause.txt", sep = "\t", row.names = FALSE)
 
 
 
