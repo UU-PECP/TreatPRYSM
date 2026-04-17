@@ -15,12 +15,23 @@ rm(headings)
 
 ### Codelist generation by disease
 
-      ### For diabetes
+    ### Fill in the following to generate a new file 
+          #- OriginalFile. Path linking to original, raw file. Setup for .txt (read_delim), but with other file type can exchange read command for read.csv, read_xlsx, etc.
+          #- LinkedIds. Input c("X" = "Y")... X =  available code variable in raw data, Y = equivalent in codebrowser data
+          #- NewFilePath. Where would you like to save the clean file? What would you like it to be called?
+  
 
-      OriginalFile <- read_delim("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\diabetes_codelist.txt", delim = "\t")
-  
-      LinkedToAurum <- inner_join(OriginalFile, codebrowser, by = c("medcode" = "MedCodeId"), keep = TRUE, suffix = c(".og", ""))
-  
+      OriginalFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\chronic_kidney_disease.txt"
+      LinkedIds <- c("readcode" = "CleansedReadCode")
+      NewFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\chronic_kidney_disease.txt"
+
+    ### Stable Macro
+
+      OriginalFile <- read_delim(OriginalFilePath, delim = "\t")
+      #OriginalFile <- read.csv("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\RheumatologicalDisease.csv")
+      
+      LinkedToAurum <- inner_join(OriginalFile, codebrowser, by = LinkedIds, keep = TRUE, suffix = c(".og", ""))
+      
       CleanLinkedCodes <- LinkedToAurum %>% 
         select(MedCodeId, Observations, OriginalReadCode, Term) %>% 
         relocate(MedCodeId, Observations, OriginalReadCode, Term) %>% 
@@ -28,43 +39,7 @@ rm(headings)
         filter(!is.na(clinicalevents)) %>% 
         distinct(medcode, .keep_all = TRUE)
 
-        write.table(CleanLinkedCodes, "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\diabetes.txt", sep = "\t", row.names = FALSE)
+        write.table(CleanLinkedCodes, NewFilePath, sep = "\t", row.names = FALSE)
 
         rm(CleanLinkedCodes, LinkedToAurum, OriginalFile)
-
-
-        ### For benign prostate hyperplasia
-        
-        OriginalFile <- read_delim("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\bph_codelist.txt", delim = "\t")
-        
-        LinkedToAurum <- inner_join(OriginalFile, codebrowser, by = c("medcode" = "SnomedCTConceptId"), keep = TRUE, suffix = c(".og", ""))
-        
-        CleanLinkedCodes <- LinkedToAurum %>% 
-          select(MedCodeId, Observations, OriginalReadCode, Term) %>% 
-          relocate(MedCodeId, Observations, OriginalReadCode, Term) %>% 
-          rename_with(~NewVariables, 1:4) %>% 
-          filter(!is.na(clinicalevents)) %>% 
-          distinct(medcode, .keep_all = TRUE)
-        
-        write.table(CleanLinkedCodes, "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\bph.txt", sep = "\t", row.names = FALSE)
-        
-        rm(CleanLinkedCodes, LinkedToAurum)
-
-        
-        ### For nephrolithiasis
-        
-        OriginalFile <- read_delim("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\nephrolithiasis_codelist.txt", delim = "\t")
-        
-        LinkedToAurum <- inner_join(OriginalFile, codebrowser, by = c("snowmedid" = "SnomedCTConceptId"), keep = TRUE, suffix = c(".og", ""))
-        
-        CleanLinkedCodes <- LinkedToAurum %>% 
-          select(MedCodeId, Observations, OriginalReadCode, Term) %>% 
-          relocate(MedCodeId, Observations, OriginalReadCode, Term) %>% 
-          rename_with(~NewVariables, 1:4) %>% 
-          filter(!is.na(clinicalevents)) %>% 
-          distinct(medcode, .keep_all = TRUE)
-        
-        write.table(CleanLinkedCodes, "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\nephrolithiasis.txt", sep = "\t", row.names = FALSE)
-        
-        rm(CleanLinkedCodes, LinkedToAurum)
 
