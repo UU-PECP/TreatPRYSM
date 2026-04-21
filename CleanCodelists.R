@@ -28,7 +28,7 @@ rm(headings)
     ### Stable Macro
 
       OriginalFile <- read_delim(OriginalFilePath, delim = "\t")
-      #OriginalFile <- read.csv("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\RheumatologicalDisease.csv")
+      #OriginalFile <- read.csv(OriginalFilePath)
       
       LinkedToAurum <- inner_join(OriginalFile, codebrowser, by = LinkedIds, keep = TRUE, suffix = c(".og", ""))
       
