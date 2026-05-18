@@ -83,8 +83,8 @@ if x and y ;
 run;
 
 Data test4;
-merge COnsult1 (in=x ) BPH_codelist (in=y);
-by medcodeid2 ;
+merge baby_clin (in=x ) fixed_bph_codelist (in=y);
+by medcodeid ;
 if x and y ;
 run;
 
