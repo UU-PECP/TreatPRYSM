@@ -20,43 +20,53 @@ proc import datafile = 'C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Docume
 	getnames=yes;
 run;
 
+/* I am going to fix the SAS file that magda made for tamsulosin */
 
+data codelist.bph_drugs_fixed;
+set codelist.tamsulosin_alfuzosin_finisteride;
+keep TermfromEMIS ProductName drugsubstancename substancestrength formulation routeofadministration bnfcode DrugIssues Exposure mg_dose;
+run;
 
-/* this is my workaround for when the files weren't being read properly, maybe I delete it later */
+data codelist.bph_drugs_fixed;
+	set codelist.bph_drugs_fixed;
+	length ProdCodeId $19;
+    set rawdata.drugissue_1;
+    if ProductName = "Finasteride 5mg tablets" then ProdCodeId = "576641000033110";
+    else if ProductName = "Finasteride 1mg tablets" then ProdCodeId = "2724041000033113";
+    else if ProductName = "Finasteride 5mg/5ml oral suspension" then ProdCodeId = "13956641000033113";
 
-data output.tamsulosin;
-	set rawdata.drugissue_1;
-	where prodcodeid in ("1406241000033110", "3342941000033112", "5632441000033119", "8960641000033119", "9201141000033115", "11524441000033118");
-	run;
+    else if ProductName = "Alfuzosin 5mg modified-release tablets" then ProdCodeId = "32541000033112";
+    else if ProductName = "Alfuzosin 2.5mg tablets" then ProdCodeId = "38141000033118";
+	else if ProductName = "Alfuzosin 10mg modified-release tablets" then ProdCodeId = "2077541000033111";
 
-	data output.alfuzosin;
-	set rawdata.drugissue_1;
-	where prodcodeid in ("3541000033112", "420309110000001107", "20775410000033111");
-	run;
+	else if ProductName = "Tamsulosin 400microgram modified-release capsules" then ProdCodeId = "1406241000033110";
+	else if ProductName = "Tamsulosin 400microgram modified-release tablets" then ProdCodeId = "3342941000033112";
+    else if ProductName = "Tamsulosin 400microgram / Dutasteride 500microgram capsules" then ProdCodeId = "5632441000033119";
+    else if ProductName = "Solifenacin 6mg / Tamsulosin 400microgram modified-release tablets" then ProdCodeId = "8960641000033119";
+    else if ProductName = "Tamsulosin 400micrograms/5ml oral solution" then ProdCodeId = "9201141000033115";
+    else if ProductName = "Tamsulosin 400micrograms/5ml oral suspension" then ProdCodeId = "11524441000033118";
+run;
 
-	data output.finasteride;
-	set rawdata.drugissue_1;
-	where prodcodeid in ("576641000033110", "2724041000033113", "13956641000033113");
-	run; 
 
 
 	/*Jos original trying with Magda's codelists */
 
 	proc sql;
-	CREATE TABLE output.new_bph_cohort AS
+	CREATE TABLE output.bph_drugs_magda AS
 	SELECT med.patid, 
 		   med.issuedate,
 		   med.quantity, 
 		   med.dosageid, 
 		   bphcod.exposure,
 		   bphcod.drugsubstancename,
-		   bphcod.mg_value
+		   bphcod.ProcCodeId,
+		   bphcod.mg_dose
 	FROM 
 		rawdata.drugissue_1 AS med
 	INNER JOIN
-		codelist.bph AS bphcod
-		ON med.prodcode = strip(put(amlcod.prodcode, best12.))
-	WHERE med.qty > 0;
+		codelist.bph_drugs_fixed AS bphcod
+		ON med.ProdCodeId = bphcod.ProdCodeId
+	WHERE med.quantity > 0;
 quit;
 /**************************************************************************/
 /* STEP 4: Subset data to only include valid prescriptions                */
@@ -67,8 +77,8 @@ quit;
 /* 2) Only keep prescriptions before March 31, 2023.                      */
 PROC SQL;
 CREATE TABLE bph_tam AS
-	SELECT T.patid, T.issueid, T.probobsid, T.drugrecid, T.issuedate, T.prodcodeid, T.dosageid, T.quantity, T.duration
-	FROM output.tamsulosin AS T
+	SELECT T.patid, T.issuedate, T.exposure, T.drugsubstancename, T.dosageid, T.quantity, T.mg_dose
+	FROM output.bph_drugs_magda AS T
 	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
 	WHERE T.issuedate > MDY(31,10,2002) and T.issuedate < MDY(03,31,2026) and T.quantity > 0 
 ORDER BY T.patid, T.issuedate; 
@@ -101,24 +111,18 @@ proc sort data = bph_tam;
 by dosageid;
 run;
 
-proc sort data = common_dosages;
+proc sort data = codelist.common_dosages;
 by dosageid;
 run;
 
 data bph_tam_dose;
-merge common_dosages (in=x) bph_tam (in=y);
+merge codelist.common_dosages (in=x) bph_tam (in=y);
 by dosageid;
 if x and y;
 run;
 
 proc contents data = bph_tam_dose;
 run;
-
-data bph_tam_dose;
-set bph_tam_dose;
-mg_dose = 0.4;
-run;
-
 
 
 proc sql;
@@ -195,7 +199,6 @@ quit;
 proc sql;
 	create table Rx_PostStart as
 	select d1.*,
-		   d2.prodcodeid,
 		   d2.issuedate,
 		   d2.treatment_duration,
 		   d2.mean_daily_dose
@@ -242,7 +245,6 @@ quit;
 proc sql;
 	create table output.EarliestRxAll as
 	select p.patid,
-		   p.prodcodeid,
 		   p.issuedate,
 		   p.treatment_duration,
 		   e.earliest_rx_date
@@ -341,7 +343,7 @@ proc sql;
 /**************************************************************************/
 /* STEP 12: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx  */
 /**************************************************************************/
-/* OUTDATED (Based on both GP and Hosp): If a patient’s first aSAH date (either GP or hosp) is before earliest Rx, we drop them.    */
+/* OUTDATED (Based on both GP and Hosp): If a patient s first aSAH date (either GP or hosp) is before earliest Rx, we drop them.    */
 
 */ data output.EarliestRx_SingleDrug2; */
 */	set output.EarliestRx_SingleDrug2;
@@ -351,7 +353,7 @@ proc sql;
 */	if not missing(first_asah_dt) and first_asah_dt < earliest_rx_date then delete;
 */ run;
 
-/* If a patient’s first aSAH date (HOSP ONLY) is before earliest Rx, we drop them.    */
+/* If a patient s first aSAH date (HOSP ONLY) is before earliest Rx, we drop them.    */
 data output.EarliestRx_SingleDrug2;
 	set output.EarliestRx_SingleDrug2;
 	first_asah_dt = min(asah_hosp_dt);
@@ -558,7 +560,7 @@ quit;
 
 /**************************************************************************/
 /* ATTEMPT 2															  */
-/* STEPS 19–22: ON-TREATMENT ANALYSIS (CENSOR ON SWITCH)                  */
+/* STEPS 19 22: ON-TREATMENT ANALYSIS (CENSOR ON SWITCH)                  */
 /**************************************************************************/
 
 /**************************************************************************/
