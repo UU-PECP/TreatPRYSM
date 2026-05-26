@@ -259,6 +259,7 @@ quit;
 
 libname raw_data "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
 libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
+libname codelist "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\3_MagdasCodes\tamsulosin_alfuzosin_finisteride.sas7bdat"
 
 %let startstudy = MDY(1,1,2004);
 %let endstudy = MDY(12,31,2026);
@@ -316,6 +317,24 @@ medcode = input(medcodeid, best19.);
 run;
 
 */ testing done */;
+
+/* trying magdas codes */
+
+proc sql;
+	CREATE TABLE output.magda_bph_cohort AS
+	SELECT 
+		cli.patid, MIN(cli.obsdate) AS bph_dt format=ddmmyy10.
+	FROM 
+		rawdata.observation_1 AS cli
+	INNER JOIN
+		codelist.bph AS bph
+		ON cli.medcodeid = bph.medcode
+	WHERE cli.obsdate <= MDY(3,31,2021)
+	GROUP BY cli.patid;
+quit;
+
+/* it works! */
+
 
 */ what if we try initially usbsetting the data for all codes, because that worked */ ;
 
