@@ -8,58 +8,21 @@ libname codelist "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Co
 
 options fullstimer; /* Display detailed resource usage info in log */
 
-
-
-
-/* This was my workaround for import errors    */
-proc import datafile = 'C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Scripts\DRUGCODELIST_COHORT1_BPH_with_active_substance_and_mg.txt'
-	out=output.bphdrugs_codelist
-	dbms=dlm
-	replace;
-	delimiter='09'x;
-	getnames=yes;
-run;
-
-/* I am going to fix the SAS file that magda made for tamsulosin */
-
-data codelist.bph_drugs_fixed;
-set codelist.tamsulosin_alfuzosin_finisteride;
-keep TermfromEMIS ProductName drugsubstancename substancestrength formulation routeofadministration bnfcode DrugIssues Exposure mg_dose;
-run;
-
-data codelist.bph_drugs_fixed;
-	set codelist.bph_drugs_fixed;
-	length ProdCodeId $19;
-    set rawdata.drugissue_1;
-    if ProductName = "Finasteride 5mg tablets" then ProdCodeId = "576641000033110";
-    else if ProductName = "Finasteride 1mg tablets" then ProdCodeId = "2724041000033113";
-    else if ProductName = "Finasteride 5mg/5ml oral suspension" then ProdCodeId = "13956641000033113";
-
-    else if ProductName = "Alfuzosin 5mg modified-release tablets" then ProdCodeId = "32541000033112";
-    else if ProductName = "Alfuzosin 2.5mg tablets" then ProdCodeId = "38141000033118";
-	else if ProductName = "Alfuzosin 10mg modified-release tablets" then ProdCodeId = "2077541000033111";
-
-	else if ProductName = "Tamsulosin 400microgram modified-release capsules" then ProdCodeId = "1406241000033110";
-	else if ProductName = "Tamsulosin 400microgram modified-release tablets" then ProdCodeId = "3342941000033112";
-    else if ProductName = "Tamsulosin 400microgram / Dutasteride 500microgram capsules" then ProdCodeId = "5632441000033119";
-    else if ProductName = "Solifenacin 6mg / Tamsulosin 400microgram modified-release tablets" then ProdCodeId = "8960641000033119";
-    else if ProductName = "Tamsulosin 400micrograms/5ml oral solution" then ProdCodeId = "9201141000033115";
-    else if ProductName = "Tamsulosin 400micrograms/5ml oral suspension" then ProdCodeId = "11524441000033118";
-run;
-
-
-
-	/*Jos original trying with Magda's codelists */
+/**************************************************************************/
+/* STEP 1: *Jos original trying with Magda's codelists;
+	* The creation of these codelists can be found in FixingCodelists
+	* mg_dose had to be created by hand;                                  */
+/**************************************************************************/
 
 	proc sql;
-	CREATE TABLE output.bph_drugs_magda AS
+	CREATE TABLE bph_drugs_magda AS
 	SELECT med.patid, 
 		   med.issuedate,
 		   med.quantity, 
 		   med.dosageid, 
 		   bphcod.exposure,
 		   bphcod.drugsubstancename,
-		   bphcod.ProcCodeId,
+		   bphcod.ProdCodeId,
 		   bphcod.mg_dose
 	FROM 
 		rawdata.drugissue_1 AS med
@@ -68,30 +31,60 @@ run;
 		ON med.ProdCodeId = bphcod.ProdCodeId
 	WHERE med.quantity > 0;
 quit;
+
 /**************************************************************************/
-/* STEP 4: Subset data to only include valid prescriptions                */
+/* STEP 2: Sanity check, are the issue dates realistic?                   */
+/**************************************************************************/
+/* Yes, most are, but there are some in the future or the distant past
+including 2050 and 1800                                                 */
+
+proc sql;
+select min(issuedate) as oldest_date format = date9.
+from bph_drugs_magda
+quit;
+
+proc sql;
+select max(issuedate) as most_recent_date format = date9.
+from bph_drugs_magda
+where issuedate < '19JUN2050'd;
+quit;
+
+proc sql;
+select distinct issuedate format=date9.
+from bph_drugs_magda
+where issuedate > '30JUN2026'd
+order by issuedate;
+quit;
+
+proc sql;
+select count(*) as number
+from bph_drugs_magda
+where issuedate > '30JUN2026'd;
+quit;
+
+proc sql;
+select count(*) as number
+from bph_drugs_magda
+where issuedate < '31OCT2002'd;
+quit;
+
+/**************************************************************************/
+/* STEP 3: Subset data to only include valid prescriptions                */
 /*         (merging with base_cohort and applying study-end restriction 
 			and quantity of at least 1)                                   */
 /**************************************************************************/
 /* 1) Join with base_cohort so only patients in our main cohort remain.   */
-/* 2) Only keep prescriptions before March 31, 2023.                      */
+/* 2) Only keep prescriptions before March 31, 2023 and after cohort begins*/
+
+
 PROC SQL;
 CREATE TABLE bph_tam AS
 	SELECT T.patid, T.issuedate, T.exposure, T.drugsubstancename, T.dosageid, T.quantity, T.mg_dose
-	FROM output.bph_drugs_magda AS T
+	FROM bph_drugs_magda AS T
 	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
-	WHERE T.issuedate > MDY(31,10,2002) and T.issuedate < MDY(03,31,2026) and T.quantity > 0 
+	WHERE T.issuedate > MDY(31,10,2002) and T.issuedate < MDY(12,31,2026) and T.quantity > 0 
 ORDER BY T.patid, T.issuedate; 
 quit;
-
-proc contents data = bph_tam;
-run;
-
-proc contents data = output.bph_cohort;
-run;
-
-proc contents data = common_dosages;
-run;
 
 
 /**************************************************************************/

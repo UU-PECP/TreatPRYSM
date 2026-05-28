@@ -148,7 +148,7 @@ quit;
 		** update: after changing input 8. to input 19., there are now 3258 cases. Much lower than expected, but still higher.;
 		*** update: fixed by Magda with Stat Transfer;
 * STEP 5: Get first bph date for each patient before end of study period;
-* ;
+* I think this should be with the patients as the unit of analysis because of group by cli.patid, is this right? KALLIOPI;
 proc sql;
 	CREATE TABLE output.bph_patients AS
 	SELECT 
@@ -161,13 +161,15 @@ proc sql;
 	GROUP BY cli.patid;
 quit;
 
-*Add bph date to base cohort and define gender;
-*X people without bph diagnosis;
+
+
+* STEP 6: Add bph date to base cohort and define gender;
+* KALLIOPI does the gender coding look logical to you? Do we need to define it?;
 PROC SQL;
 	CREATE TABLE intermediatefile_1 AS
 	SELECT
 		bc.patid, 
-		CASE WHEN bc.gender = "1" THEN "Male" WHEN bc.gender = "2" THEN "Female" END AS gender,
+		bc.gender,
 		bc.yob,
 		bc.cprd_ddate,
 		bc.regstartdate, 
@@ -182,7 +184,7 @@ PROC SQL;
 	WHERE bph_coh.bph_dt IS NOT NULL;
 quit;
 
-*Define baseline_dt;
+*Step 7: Define baseline_dt;
 *[CHECK WITH SHAHAB] For completeness this should include the start of HES APC coverage. However, since this is before our study period (April 1997), it is not necessary to add here.; 
 data intermediatefile_2;
 	set intermediatefile_1;
@@ -267,13 +269,14 @@ proc sql;
 	GROUP BY cli.patid;
 quit;
 
-*Add nl date to base cohort and define gender;
-*X people without nl diagnosis;
+* STEP 6: Add nl date to base cohort and define gender;
+* KALLIOPI does the gender coding look logical to you? Do we need to define it?;
+* 1 is male 2 is female, we deleted character definitions because it seemed unecessary;
+
 PROC SQL;
 	CREATE TABLE intermediatefile_3 AS
 	SELECT
-		bc.patid, 
-		CASE WHEN bc.gender = "1" THEN "Male" WHEN bc.gender = "2" THEN "Female" END AS gender,
+		bc.patid,
 		bc.yob,
 		bc.cprd_ddate,
 		bc.regstartdate, 
@@ -288,12 +291,13 @@ PROC SQL;
 	WHERE nl_coh.nl_dt IS NOT NULL;
 quit;
 
-*Define baseline_dt;
+*Step 7: Define baseline_dt;
 *[CHECK WITH SHAHAB] For completeness this should include the start of HES APC coverage. However, since this is before our study period (April 1997), it is not necessary to add here.; 
 data intermediatefile_4;
 	set intermediatefile_3;
 
 	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
+	*do we need this step?;
 	baseline_dt = max(of regstartdate nl_dt);
 	if baseline_dt < '1DEC2007'd then baseline_dt = '1DEC2007'd;
 
@@ -354,3 +358,20 @@ SELECT COUNT(*) FROM output.nl_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
+
+
+***********************************************;
+************** EXPORTING PATIDS ***************;
+***********************************************;
+
+proc export data = output.nl_cohort (keep = patid)
+outfiles = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_NL.csv"
+dbms=csv
+replace;
+run;
+
+proc export data = output.bph_cohort (keep = patid)
+outfiles = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
+dbms=csv
+replace;
+run;
