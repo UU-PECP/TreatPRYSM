@@ -7,7 +7,7 @@ options fullstimer;
 
 
 *STEP 1: Define a base cohort by stringing together 4 patient files;
-	*  The following columns were not found in the contributing tables: crd, deathdate, frd, tod;
+	*  	The following columns were not found in the contributing tables: crd, deathdate, frd, tod;
 	* 	this is due to different variable names between CPRD Aurum and CPRD Gold;
 	*	Equivalents in Aurum are regstartdate, cprd_ddate, regenddate;
 proc sql;
@@ -63,7 +63,6 @@ proc sql;
 	FROM rawdata.patient_4; 
 quit;
 
-*STEP 2: Combining base cohort files 1:4 to create initial_cohort, saved in output;
 
 data output.initial_cohort;
 set base_cohort_1
@@ -72,7 +71,10 @@ set base_cohort_1
 	base_cohort_4;
 run;
 
-*STEP 3: Create 1 event file out of 4 event files; 
+*STEP 2: Create 1 event file out of 4 event files; 
+	*	selecting only certain variables
+	*	
+
 Data clinical_1 ;
 Set rawdata.observation_1 (keep=patid obsdate medcodeid obstypeid);
 run;
@@ -90,17 +92,15 @@ Set rawdata.observation_4 (keep=patid obsdate medcodeid obstypeid);
 run;
 
 
-*STEP 4: Combining base cohort files 1:4 to create initial_cohort, saved in output;
-
 data output.clinical;
-set clinical_1
+	set clinical_1
 	clinical_2
 	clinical_3
 	clinical_4;
 run;
 
 
-*STEP 5: Import HES linkage list to only include individuals with both hospital inpatient (hes_apc_e) and socioeconomic status (lsao_e) data;
+*STEP 3: Import HES linkage list to only include individuals with both hospital inpatient (hes_apc_e) and socioeconomic status (lsao_e) data;
 
 proc import datafile = "F:\Users\Wyatt003\Documentation CPRD\Aurum_enhanced_eligibility_November_2024.txt"
 	out=linkage_coverage
@@ -118,7 +118,7 @@ put(patid, 19.) as patid length=19
 from linkage_coverage; 
 run;
 
-*Step 6: TEMPORARY find aSAH cases in clinical file;
+*Step 4: TEMPORARY find aSAH cases in clinical file;
 	* replace with HES data when available;
 	* 4514 patients;
 proc sql;
@@ -128,10 +128,13 @@ proc sql;
 	FROM 
 		output.clinical AS clin
 	WHERE clin.medcodeId IN (
-		"481028017", "300257016", "80811100000611", "12351100000611", "12348100000611", "12352100000611", "12344100000611"
+		"481028017", "300257016", "123511000006114", "123441000006112", "320735017",
+		"123481000006118", "123521000006118", "123491000006115", "300244012",
+		"300253017", "300935019", "300936018"
 )
 	GROUP BY clin.patid;
 quit;
+
 
 
 
