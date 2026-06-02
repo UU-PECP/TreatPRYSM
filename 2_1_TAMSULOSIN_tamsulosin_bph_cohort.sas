@@ -14,6 +14,32 @@ options fullstimer; /* Display detailed resource usage info in log */
 	* mg_dose had to be created by hand;                                  */
 /**************************************************************************/
 
+
+Data drug_1 ;
+Set rawdata.drugissue_1 (keep=patid issuedate prodcodeid dosageid);
+run;
+
+Data drug_2 ;
+Set rawdata.drugissue_2 (keep=patid issuedate prodcodeid dosageid);
+run;
+
+Data drug_3 ;
+Set rawdata.drugissue_3 (keep=patid issuedate prodcodeid dosageid);
+run;
+
+Data drug_4 ;
+Set rawdata.drugissue_4 (keep=patid issuedate prodcodeid dosageid);
+run;
+
+* The data set OUTPUT.DRUG has 642563242 observation;
+
+data output.drug;
+	set drug_1
+	drug_2
+	drug_3
+	drug_4;
+run;
+
 	proc sql;
 	CREATE TABLE bph_drugs_magda AS
 	SELECT med.patid, 
@@ -25,7 +51,7 @@ options fullstimer; /* Display detailed resource usage info in log */
 		   bphcod.ProdCodeId,
 		   bphcod.mg_dose
 	FROM 
-		rawdata.drugissue_1 AS med
+		output.clinical AS med
 	INNER JOIN
 		codelist.bph_drugs_fixed AS bphcod
 		ON med.ProdCodeId = bphcod.ProdCodeId

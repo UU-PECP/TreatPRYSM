@@ -71,9 +71,75 @@ set base_cohort_1
 	base_cohort_4;
 run;
 
+
+/* Exclude patients from wales*/
+
+/*Import practice records */
+
+proc sql;
+	CREATE TABLE practice_1 AS
+	SELECT
+		region,
+		pracid
+	FROM rawdata.practice_1; 
+quit;
+
+
+proc sql;
+	CREATE TABLE practice_2 AS
+	SELECT
+		region,
+		pracid
+	FROM rawdata.practice_2; 
+quit;
+
+proc sql;
+	CREATE TABLE practice_3 AS
+	SELECT
+		region,
+		pracid
+	FROM rawdata.practice_3; 
+quit;
+
+proc sql;
+	CREATE TABLE practice_4 AS
+	SELECT
+		region,
+		pracid
+	FROM rawdata.practice_4; 
+quit;
+
+
+
+data output.practice;
+set practice_1
+	practice_2
+	practice_3
+	practice_4;
+run;
+
+proc sql;
+CREATE TABLE initial_cohort;
+SELECT
+		patid,
+		gender,
+		yob,
+		regstartdate, 
+		cprd_ddate, 
+		regenddate,
+		pracid
+FROM output.initial_cohort AS coh
+LEFT OUTER JOIN
+		practice AS pra
+		ON coh.pracid = pra.pracid
+        WHERE region ne 10;
+quit;
+
+*I HAVENT ACTUALLY RUN THE ABOVE, PLEASE DOUBLE CHECK*
+
 *STEP 2: Create 1 event file out of 4 event files; 
 	*	selecting only certain variables
-	*	
+	*	;
 
 Data clinical_1 ;
 Set rawdata.observation_1 (keep=patid obsdate medcodeid obstypeid);
@@ -157,12 +223,14 @@ proc sql;
 	INNER JOIN
 		codelist.bph AS bph
 		ON cli.medcodeId = bph.medcode
+        WHERE cli.obsdate < '31MAR2023'd
 	GROUP BY cli.patid;
 quit;
 
 
 
 	*Add bph date to base cohort;
+	* NOTE: Why do we lose about 200 patients here? 264340 at previous substep, and 264203 here;
 
 PROC SQL;
 	CREATE TABLE intermediatefile_1 AS
@@ -172,7 +240,6 @@ PROC SQL;
 		bc.yob,
 		bc.cprd_ddate,
 		bc.regstartdate, 
-		bc.cprd_ddate, 
 		bc.regenddate,
 		bph_coh.bph_dt
 	FROM
@@ -204,7 +271,7 @@ run;
 
 	*must strip both patids, otherwise outputs 0 observations;
 	* 340378 patients;
-	* NOTE: should we do other basic exclusions here before we extract the patids?
+	* NOTE: should we do other basic exclusions here before we extract the patids?;
 
 proc sql;
 	create table linked_bph_cohort as
@@ -239,10 +306,19 @@ quit;
 proc contents data = output.bph_cohort;
 run;
 
-* 1632 aSAH cases in this cohort;
+* 1550 aSAH cases in this cohort;
 proc SQL;
 SELECT COUNT(*) FROM output.bph_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
+quit;
+
+* SANITY CHECK *;
+
+proc SQL;
+	CREATE TABLE asahonly AS
+	SELECT bc.*
+	FROM output.bph_cohort AS bc
+	WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
 *******************************************************************************
@@ -257,16 +333,18 @@ quit;
 	*Get first nl date for each patient before end of study period;
 
 proc sql;
-	CREATE TABLE output.nl_patients AS
-	SELECT 
-		cli.patid, MIN(cli.obsdate) AS nl_dt format=ddmmyy10.
-	FROM 
-		output.clinical AS cli
-	INNER JOIN
-		codelist.nephrolithiasis AS nl
-		ON cli.medcodeId = nl.medcode
-	GROUP BY cli.patid;
+      CREATE TABLE output.nl_patients AS
+      SELECT
+          cli.patid, MIN(cli.obsdate) AS nl_dt format=ddmmyy10.
+      FROM
+          output.clinical AS cli
+      INNER JOIN
+          codelist.nephrolithiasis AS nl
+          ON cli.medcodeId = nl.medcode
+          WHERE cli.obsdate < '31MAR2023'd
+      GROUP BY cli.patid;
 quit;
+
 
 
 PROC SQL;
@@ -276,7 +354,6 @@ PROC SQL;
 		bc.yob,
 		bc.cprd_ddate,
 		bc.regstartdate, 
-		bc.cprd_ddate, 
 		bc.regenddate,
 		nl_coh.nl_dt
 	FROM
@@ -285,6 +362,7 @@ PROC SQL;
 		output.nl_patients AS nl_coh
 		ON bc.patid = nl_coh.patid
 	WHERE nl_coh.nl_dt IS NOT NULL;
+	*without the above line, could this step be replaced by an inner join? ;
 quit;
 
 	*Define baseline_dt as nl date or registration start date, whichever is most recent, 
@@ -321,7 +399,7 @@ run;
 
 	*must strip both patids, otherwise outputs 0 observations;
 	* 340378 patients;
-	* NOTE: should we do other basic exclusions here before we extract the patids?
+	* NOTE: should we do other basic exclusions here before we extract the patids?;
 
 
 proc sql;
@@ -337,7 +415,7 @@ run;
 proc contents data = linked_nl_cohort;
 run;
 
-	*Quick sanity check to see whether there are no duplicates;
+	*Quick sanity check to see whether there are no duplicates ;
 	*No duplicates! ;
 proc sql;
 	create table test as
@@ -359,7 +437,7 @@ quit;
 proc contents data = output.nl_cohort;
 run;
 
-* 597 aSAH cases in this cohort;
+* 529 aSAH cases in this cohort (597 with incorrect codes from 01-06-2026);
 proc SQL;
 SELECT COUNT(*) FROM output.nl_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
