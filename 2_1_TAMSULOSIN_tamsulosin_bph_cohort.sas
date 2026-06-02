@@ -88,7 +88,7 @@ quit;
 
 
 /**************************************************************************/
-/* STEP 6: Add daily dosage information                                  */
+/* STEP 4: Add daily dosage information                                  */
 /**************************************************************************/
 /* 1) Left-join with common_dosages to retrieve typical daily dose.       */          
 /* 2) Calculate 'treatment_duration' = quantity / daily_dose.             */
@@ -167,7 +167,7 @@ quit;
 
 
 /**************************************************************************/
-/* STEP 6: Create 'PrevalentUsers' dataset                                */
+/* STEP 5: Exclude 'PrevalentUsers'                               */
 /**************************************************************************/
 /* 'Prevalent users' are those who had a drug prescription X years before   */
 /* their baseline date. We identify them by comparing eventdate with the  */
@@ -184,11 +184,9 @@ proc sql;
 	where d2.issuedate between intnx('year', d1.baseline_dt, -&years) and d1.baseline_dt - 1;
 quit;
 
-/**************************************************************************/
-/* STEP 7: Exclude prevalent users and keep only Rx on/after the baseline */
-/**************************************************************************/
-/* 1) We remove those in PrevalentUsers.                                  */
-/* 2) We only keep prescriptions dated on or after baseline.             */
+
+/* We remove those in PrevalentUsers.                                  */
+/* We only keep prescriptions dated on or after baseline.             */
 proc sql;
 	create table Rx_PostStart as
 	select d1.*,
@@ -216,7 +214,7 @@ quit;
 *40 thousand is a really low number... are we sure? ;
 
 /**************************************************************************/
-/* STEP 8: Identify earliest prescription date for each patient           */
+/* STEP 6: Identify earliest prescription date for each patient           */
 /**************************************************************************/
 /* Finds the minimum (earliest) eventdate among the valid prescriptions.  */
 proc sql;
@@ -228,9 +226,9 @@ proc sql;
 	;
 quit;
 
-/**************************************************************************/
-/* STEP 9: Merge back to keep the row(s) that match earliest date         */
-/**************************************************************************/
+
+/*Merge back to keep the row(s) that match earliest date         */
+
 /* 1) We only keep rows where eventdate = earliest_rx_date.               */
 /* 2) We call this 'EarliestRxAll'.                                       */
 /* 3) If multiple rows share the same earliest date for a patient, we     */
@@ -248,11 +246,11 @@ proc sql;
 	;
 quit;
 
-/**************************************************************************/
-/* STEP 10: Exclude patients who have more than one record on earliest Rx */
-/**************************************************************************/
-/* If a patient has >1 row on the earliest date (possibly multiple drugs), */
+
+/*Exclude patients who have more than one record on earliest Rx */
+/* If a patient has >1 row on the earliest date (possibly multiple drugs),*/
 /* we remove them so each patient has exactly one earliest Rx.            */
+
 proc sql;
 	create table output.ExcludeMulti as
 	select patid
@@ -293,9 +291,8 @@ proc sql;
 quit;
 
 
-/**************************************************************************/
-/* STEP 11: Merge the single earliest Rx info with base_cohort            */
-/**************************************************************************/
+
+/* Merge the single earliest Rx info with base_cohort            */
 /* Add baseline info from base_cohort, creating 'EarliestRx_SingleDrug2'. */
 proc sql;
 	create table output.EarliestRx_SingleDrug2 as
@@ -308,33 +305,7 @@ proc sql;
 quit;
 
 /**************************************************************************/
-/* Check the differences in gp based and icp based definitions of aSAH    */
-/**************************************************************************/
-
-proc sql;
-	create table output.test as
-	select * from output.EarliestRx_SingleDrug2
-	where first_asah_dt IS NOT NULL
-	;
-
-proc sql;
-	create table output.test2 as
-	select * from output.test
-	where aSAH_hosp_dt IS NULL AND aSAH_gp_dt IS NOT NULL
-	;
-
-proc sql;
-	select * from rawdata.clinical
-	WHERE patid in ('1022210525', '1039310321', '1068510359', '108910016', '1137410043')
-	ORDER BY patid, aSAH_dt;
-
-proc sql;
-	select * from output.hes_diagnosis_hosp
-	WHERE patid in (1022210525,1039310321,1068510359,108910016,1137410043)
-	ORDER BY patid, hosp.admidate;
-
-/**************************************************************************/
-/* STEP 12: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx  */
+/* STEP 7: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx  */
 /**************************************************************************/
 /* OUTDATED (Based on both GP and Hosp): If a patient s first aSAH date (either GP or hosp) is before earliest Rx, we drop them.    */
 
@@ -357,7 +328,7 @@ run;
 
 
 /**************************************************************************/
-/* STEP 13: Keep only the same drug as earliest for final prescription set*/
+/* STEP 8: Keep only the same drug as earliest for final prescription set*/
 /**************************************************************************/
 /* 1) We bring back all prescriptions from Rx_PostStart that match the    */
 /*    same exposure name and occur after earliest Rx date for that patid. */
@@ -374,7 +345,7 @@ proc sql;
 quit;
 
 /**************************************************************************/
-/* STEP 14: Use a bridging algorithm to combine Rx coverage blocks        */
+/* STEP 9: Use a bridging algorithm to combine Rx coverage blocks        */
 /**************************************************************************/
 /* 1) bridged_period_id increments whenever there is a days_between_prescriptions > gap_days.    */
 /* 2) If the days_between_prescriptions is <= gap_days, we consider it the same coverage block.  */
@@ -416,7 +387,7 @@ data output.BridgeCoverage;
 run;
 
 /**************************************************************************/
-/* STEP 15: Keep only the first coverage block for per-protocol analysis  */
+/* STEP 10: Keep only the first coverage block for per-protocol analysis  */
 /**************************************************************************/
 /* For a strict per-protocol analysis, we only use bridged_period_id=1.   */
 proc sort data = output.BridgeCoverage;
@@ -460,7 +431,7 @@ proc sql;
 quit;
 
 /**************************************************************************/
-/* STEP 16: Combine coverage block info with base_cohort => final PP set  */
+/* STEP 11: Combine coverage block info with base_cohort => final PP set  */
 /**************************************************************************/
 /* 1) index_date = bridged_coverage_start                                          */
 /* 2) We also bring in relevant baseline data from base_cohort.           */
@@ -480,7 +451,7 @@ proc sql;
 quit;
 
 /**************************************************************************/
-/* STEP 17: Apply end-of-follow-up rules => create final PP dataset       */
+/* STEP 12: Apply end-of-follow-up rules => create final PP dataset       */
 /**************************************************************************/
 /* 1) end_of_fu = min(end_of_treatment, deathdate, aSAH_hosp_dt, etc.)    				  */
 /* 2) Exclude those whose index_date is after any of these end dates i.e. negative fu     */
@@ -515,7 +486,7 @@ proc sql;
 quit;
 
 /**************************************************************************/
-/* STEP 18: Optional checks and basic descriptives                        */
+/* Optional checks and basic descriptives                        */
 /**************************************************************************/
 /* Quick example: Count exposure groups and describe follow-up durations  */
 proc sql;
@@ -551,13 +522,12 @@ proc sql;
 quit;
 
 
-/**************************************************************************/
-/* ATTEMPT 2															  */
-/* STEPS 19 22: ON-TREATMENT ANALYSIS (CENSOR ON SWITCH)                  */
+/**************************************************************************/						  */
+/* STEPS 13-16: ON-TREATMENT ANALYSIS (CENSOR ON SWITCH)                  */
 /**************************************************************************/
 
 /**************************************************************************/
-/* STEP 19: Determine earliest switch date to the other exposure          */
+/* STEP 13: Determine earliest switch date to the other exposure          */
 /**************************************************************************/
 
 /*We already have these tables:
@@ -608,7 +578,7 @@ quit;
 
 
 /**************************************************************************/
-/* STEP 20: Build an on-treatment follow-up dataset and censor at switch  */
+/* STEP 14: Build an on-treatment follow-up dataset and censor at switch  */
 /**************************************************************************/
 /* Merges base_cohort with EarliestRx_SingleDrug 2 (which has earliest
 	Rx date for the index drug) and apply end-of-study censoring, plus
@@ -643,7 +613,7 @@ data output.OverallFollowup_OnT;
 run;
 
 /**************************************************************************/
-/* STEP 21: Bridge Coverage for the index drug only  */
+/* STEP 15: Bridge Coverage for the index drug only  */
 /**************************************************************************/
 /* From Step 13, AllIndexDrug included all prescriptions for the single
    index drug, from earliest Rx date onward. */
@@ -682,7 +652,7 @@ data output.BridgeCoverage_IndexDrug;
 run;
 
 /**************************************************************************/
-/* STEP 22: Create 30-day intervals and classify recency  */
+/* STEP 16: Create 30-day intervals and classify recency  */
 /**************************************************************************/
 /* Use OverallFollowup_OnT with switch-based censoring and 
    BridgeCoverage_IndexDrug to define coverage recency. */

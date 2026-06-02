@@ -120,7 +120,6 @@ run;
 
 *Step 4: TEMPORARY find aSAH cases in clinical file;
 	* replace with HES data when available;
-	* 4514 patients;
 proc sql;
 	CREATE TABLE output.aSAH_gp AS
 	SELECT 
@@ -145,13 +144,10 @@ quit;
 *******************************************************************************;
 
 *NOTE: contains several intermediate files in work library that will be overwritten later in nephrolithiasis cohort generation;
+* STEP 5: Add information on bph and baseline date;
 
-* Something is not right with step 5, because it says there are only 4000 patients with BPH;
-		* This may be accurate and not an issue with excluding obsetypeid, because the unaltered first clinical file only has 1000 cases. Multiplied by 4 = 4000;
-		** update: after changing input 8. to input 19., there are now 3258 cases. Much lower than expected, but still higher.;
-		*** update: fixed by Magda with Stat Transfer;
-* STEP 5: Get first bph date for each patient before end of study period;
-* I think this should be with the patients as the unit of analysis because of group by cli.patid, is this right? KALLIOPI;
+	*Get first bph date for each patient before end of study period;
+
 proc sql;
 	CREATE TABLE output.bph_patients AS
 	SELECT 
@@ -166,8 +162,8 @@ quit;
 
 
 
-* STEP 6: Add bph date to base cohort and define gender;
-* KALLIOPI does the gender coding look logical to you? Do we need to define it?;
+	*Add bph date to base cohort;
+
 PROC SQL;
 	CREATE TABLE intermediatefile_1 AS
 	SELECT
@@ -187,34 +183,29 @@ PROC SQL;
 	WHERE bph_coh.bph_dt IS NOT NULL;
 quit;
 
-*Step 7: Define baseline_dt;
-*[CHECK WITH SHAHAB] For completeness this should include the start of HES APC coverage. However, since this is before our study period (April 1997), it is not necessary to add here.; 
+	*Define baseline_dt as bph date or registration start date, whichever is most recent, 
+	 if patients enter the cohort before study period begins, then study period beginning October 31 2002 is their baseline date
+	 and if the registration start date happens less than 365 days before the baseline date, then the patients are not included;
+
+	*NOTE: I take issue with this actually, because if we have only bph patients I don't see how any patient could be registered after their bph diagnosis;
+
 data intermediatefile_2;
 	set intermediatefile_1;
-
-	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
 	baseline_dt = max(of regstartdate bph_dt);
 	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
-
-
-
-	*Only include people w at least  365 days of continuous enrollment;
 	days_diff = baseline_dt - regstartdate;
 	if days_diff >= 365;
-
-	*Drop variables no longer needed;
 	drop days_diff regstartdate bph_dt;
-
 	format baseline_dt ddmmyy10.;
 
 run;
 
-proc contents data = intermediatefile_2;
-run;
+* STEP 6: Extract patids of patients with linked HES data;
 
+	*must strip both patids, otherwise outputs 0 observations;
+	* 340378 patients;
+	* NOTE: should we do other basic exclusions here before we extract the patids?
 
-*must strip both patids, otherwise outputs 0 observations;
-* 340378 patients;
 proc sql;
 	create table linked_bph_cohort as
 	select bc.*
@@ -226,8 +217,8 @@ run;
 proc contents data = linked_bph_cohort;
 run;
 
-*Quick sanity check to see whether there are no duplicates;
-*No duplicates! ;
+	*Quick sanity check to see whether there are no duplicates;
+	*No duplicates! ;
 proc sql;
 	create table test as
 	select distinct patid
@@ -260,6 +251,11 @@ quit;
 
 *******************************************************************************;
 
+*NOTE: contains several intermediate files in work library that will be overwritten later in nephrolithiasis cohort generation;
+* STEP 7: Add information on bph and baseline date;
+
+	*Get first nl date for each patient before end of study period;
+
 proc sql;
 	CREATE TABLE output.nl_patients AS
 	SELECT 
@@ -272,9 +268,6 @@ proc sql;
 	GROUP BY cli.patid;
 quit;
 
-* STEP 6: Add nl date to base cohort and define gender;
-* KALLIOPI does the gender coding look logical to you? Do we need to define it?;
-* 1 is male 2 is female, we deleted character definitions because it seemed unecessary;
 
 PROC SQL;
 	CREATE TABLE intermediatefile_3 AS
@@ -294,12 +287,16 @@ PROC SQL;
 	WHERE nl_coh.nl_dt IS NOT NULL;
 quit;
 
-*Step 7: Define baseline_dt;
-*[CHECK WITH SHAHAB] For completeness this should include the start of HES APC coverage. However, since this is before our study period (April 1997), it is not necessary to add here.; 
+	*Define baseline_dt as nl date or registration start date, whichever is most recent, 
+	 if patients enter the cohort before study period begins, then study period beginning October 31 2002 is their baseline date
+	 and if the registration start date happens less than 365 days before the baseline date, then the patients are not included;
+
+	*NOTE: I take issue with this actually, because if we have only bph patients I don't see how any patient could be registered after their nl diagnosis;
+
 data intermediatefile_4;
 	set intermediatefile_3;
 
-	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
+	*Define baseline dt as first date of 01-12-2007, registration, or nephrolithiasis diagnosis;
 	*do we need this step?;
 	baseline_dt = max(of regstartdate nl_dt);
 	if baseline_dt < '1DEC2007'd then baseline_dt = '1DEC2007'd;
@@ -320,6 +317,13 @@ run;
 proc contents data = intermediatefile_4;
 run;
 
+* STEP 8: Extract patids of patients with linked HES data;
+
+	*must strip both patids, otherwise outputs 0 observations;
+	* 340378 patients;
+	* NOTE: should we do other basic exclusions here before we extract the patids?
+
+
 proc sql;
 	create table linked_nl_cohort as
 	select bc.*
@@ -328,13 +332,13 @@ proc sql;
 	where lsoa_e = 1 and hes_apc_e = 1;
 run;
 
-* 141130 patients;
+	* 141130 patients;
 
 proc contents data = linked_nl_cohort;
 run;
 
-*Quick sanity check to see whether there are no duplicates;
-*No duplicates! ;
+	*Quick sanity check to see whether there are no duplicates;
+	*No duplicates! ;
 proc sql;
 	create table test as
 	select distinct patid
@@ -366,6 +370,8 @@ quit;
 ***********************************************;
 ************** EXPORTING PATIDS ***************;
 ***********************************************;
+
+* STEP 9: create external files;
 
 proc export data = output.nl_cohort (keep = patid)
 outfiles = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_NL.csv"
