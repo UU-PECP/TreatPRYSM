@@ -119,23 +119,22 @@ set practice_1
 run;
 
 proc sql;
-CREATE TABLE initial_cohort;
+CREATE TABLE initial_cohort AS
 SELECT
-		patid,
-		gender,
-		yob,
-		regstartdate, 
-		cprd_ddate, 
-		regenddate,
-		pracid
+		coh.patid,
+		coh.gender,
+		coh.yob,
+		coh.regstartdate, 
+		coh.cprd_ddate, 
+		coh.regenddate,
+		coh.pracid
 FROM output.initial_cohort AS coh
 LEFT OUTER JOIN
-		practice AS pra
+		output.practice AS pra
 		ON coh.pracid = pra.pracid
         WHERE region ne 10;
 quit;
 
-*I HAVENT ACTUALLY RUN THE ABOVE, PLEASE DOUBLE CHECK*
 
 *STEP 2: Create 1 event file out of 4 event files; 
 	*	selecting only certain variables
@@ -178,11 +177,11 @@ run;
 
 * This is added upon reccommendation from Jos to actually add in trailing spaces to apc_linkage file patid;
 proc sql;
-create table linkage_character as
+create table output.linkage_character as
 select lsoa_e, hes_apc_e,
 put(patid, 19.) as patid length=19
 from linkage_coverage; 
-run;
+quit;
 
 *Step 4: TEMPORARY find aSAH cases in clinical file;
 	* replace with HES data when available;
@@ -209,13 +208,12 @@ quit;
 
 *******************************************************************************;
 
-*NOTE: contains several intermediate files in work library that will be overwritten later in nephrolithiasis cohort generation;
 * STEP 5: Add information on bph and baseline date;
 
 	*Get first bph date for each patient before end of study period;
 
 proc sql;
-	CREATE TABLE output.bph_patients AS
+	CREATE TABLE output.bph_cases AS
 	SELECT 
 		cli.patid, MIN(cli.obsdate) AS bph_dt format=ddmmyy10.
 	FROM 
@@ -231,6 +229,7 @@ quit;
 
 	*Add bph date to base cohort;
 	* NOTE: Why do we lose about 200 patients here? 264340 at previous substep, and 264203 here;
+	* Is it because some of the patients in the clinical file are not in the patient file?;
 
 PROC SQL;
 	CREATE TABLE intermediatefile_1 AS
@@ -245,7 +244,7 @@ PROC SQL;
 	FROM
 		output.initial_cohort AS bc
 	LEFT OUTER JOIN
-		output.bph_patients AS bph_coh
+		output.bph_cases AS bph_coh
 		ON bc.patid = bph_coh.patid
 	WHERE bph_coh.bph_dt IS NOT NULL;
 quit;
@@ -254,7 +253,7 @@ quit;
 	 if patients enter the cohort before study period begins, then study period beginning October 31 2002 is their baseline date
 	 and if the registration start date happens less than 365 days before the baseline date, then the patients are not included;
 
-	*NOTE: I take issue with this actually, because if we have only bph patients I don't see how any patient could be registered after their bph diagnosis;
+	*NOTE: I am concerned about this because if we have only bph patients I don't see how any patient could be registered after their bph diagnosis;
 
 data intermediatefile_2;
 	set intermediatefile_1;
@@ -276,7 +275,7 @@ run;
 proc sql;
 	create table linked_bph_cohort as
 	select bc.*
-	from linkage_character as lc
+	from output.linkage_character as lc
 	inner join intermediatefile_2 as bc on strip(lc.patid) = strip(bc.patid)
 	where lsoa_e = 1 and hes_apc_e = 1;
 run;
@@ -333,7 +332,7 @@ quit;
 	*Get first nl date for each patient before end of study period;
 
 proc sql;
-      CREATE TABLE output.nl_patients AS
+      CREATE TABLE output.nl_cases AS
       SELECT
           cli.patid, MIN(cli.obsdate) AS nl_dt format=ddmmyy10.
       FROM
@@ -359,7 +358,7 @@ PROC SQL;
 	FROM
 		output.initial_cohort AS bc
 	LEFT OUTER JOIN
-		output.nl_patients AS nl_coh
+		output.nl_cases AS nl_coh
 		ON bc.patid = nl_coh.patid
 	WHERE nl_coh.nl_dt IS NOT NULL;
 	*without the above line, could this step be replaced by an inner join? ;
@@ -369,7 +368,7 @@ quit;
 	 if patients enter the cohort before study period begins, then study period beginning October 31 2002 is their baseline date
 	 and if the registration start date happens less than 365 days before the baseline date, then the patients are not included;
 
-	*NOTE: I take issue with this actually, because if we have only bph patients I don't see how any patient could be registered after their nl diagnosis;
+	*NOTE: if we only have nl patients I don't see how any patient could be registered after their nl diagnosis;
 
 data intermediatefile_4;
 	set intermediatefile_3;
@@ -405,12 +404,12 @@ run;
 proc sql;
 	create table linked_nl_cohort as
 	select bc.*
-	from linkage_character as lc
+	from output.linkage_character as lc
 	inner join intermediatefile_4 as bc on strip(lc.patid) = strip(bc.patid)
 	where lsoa_e = 1 and hes_apc_e = 1;
 run;
 
-	* 141130 patients;
+	* 121475 patients;
 
 proc contents data = linked_nl_cohort;
 run;
@@ -452,13 +451,13 @@ quit;
 * STEP 9: create external files;
 
 proc export data = output.nl_cohort (keep = patid)
-outfiles = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_NL.csv"
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_NL.csv"
 dbms=csv
 replace;
 run;
 
 proc export data = output.bph_cohort (keep = patid)
-outfiles = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
 dbms=csv
 replace;
 run;
