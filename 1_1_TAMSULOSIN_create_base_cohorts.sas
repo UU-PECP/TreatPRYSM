@@ -1,3 +1,10 @@
+
+** 	the Treat-PRYSM project 		**
+** 	by Sage Wyatt and Shahab Abtahi **
+** 	October 2025 - September 2026 	**
+**	Drug - Tamsulosin				**;
+
+
 libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
 libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
 libname codelist "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\3_MagdasCodes";
@@ -71,7 +78,7 @@ set base_cohort_1
 	base_cohort_4;
 run;
 
-
+*Step 2; 
 /* Exclude patients from wales*/
 
 /*Import practice records */
@@ -136,7 +143,7 @@ LEFT OUTER JOIN
 quit;
 
 
-*STEP 2: Create 1 event file out of 4 event files; 
+*STEP 3: Create 1 event file out of 4 event files; 
 	*	selecting only certain variables
 	*	;
 
@@ -164,24 +171,6 @@ data output.clinical;
 	clinical_4;
 run;
 
-
-*STEP 3: Import HES linkage list to only include individuals with both hospital inpatient (hes_apc_e) and socioeconomic status (lsao_e) data;
-
-proc import datafile = "F:\Users\Wyatt003\Documentation CPRD\Aurum_enhanced_eligibility_November_2024.txt"
-	out=linkage_coverage
-	dbms=dlm
-	replace;
-	delimiter='09'x;
-	getnames=yes;
-run;
-
-* This is added upon reccommendation from Jos to actually add in trailing spaces to apc_linkage file patid;
-proc sql;
-create table output.linkage_character as
-select lsoa_e, hes_apc_e,
-put(patid, 19.) as patid length=19
-from linkage_coverage; 
-quit;
 
 *Step 4: TEMPORARY find aSAH cases in clinical file;
 	* replace with HES data when available;
@@ -249,39 +238,35 @@ PROC SQL;
 	WHERE bph_coh.bph_dt IS NOT NULL;
 quit;
 
+
 	*Define baseline_dt as bph date or registration start date, whichever is most recent, 
 	 if patients enter the cohort before study period begins, then study period beginning October 31 2002 is their baseline date
 	 and if the registration start date happens less than 365 days before the baseline date, then the patients are not included;
 
-	*NOTE: I am concerned about this because if we have only bph patients I don't see how any patient could be registered after their bph diagnosis;
-
 data intermediatefile_2;
 	set intermediatefile_1;
-	baseline_dt = max(of regstartdate bph_dt);
+	baseline_dt = max(regstartdate, bph_dt);
 	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
-	days_diff = baseline_dt - regstartdate;
-	if days_diff >= 365;
-	drop days_diff regstartdate bph_dt;
+	drop regstartdate bph_dt; 
 	format baseline_dt ddmmyy10.;
-
 run;
 
 * STEP 6: Extract patids of patients with linked HES data;
 
-	*must strip both patids, otherwise outputs 0 observations;
-	* 340378 patients;
-	* NOTE: should we do other basic exclusions here before we extract the patids?;
-
 proc sql;
 	create table linked_bph_cohort as
 	select bc.*
-	from output.linkage_character as lc
-	inner join intermediatefile_2 as bc on strip(lc.patid) = strip(bc.patid)
-	where lsoa_e = 1 and hes_apc_e = 1;
+	from rawdata.linkage_eligibility as lc
+	inner join intermediatefile_2 as bc on lc.patid = bc.patid;
+	
+quit;
+
+*where lsoa_e = 1 and hes_apc_e = 1;
+
+Proc freq data = rawdata.linkage_eligibility ;
+table hes_apc_e*lsoa_e ;
 run;
 
-proc contents data = linked_bph_cohort;
-run;
 
 	*Quick sanity check to see whether there are no duplicates;
 	*No duplicates! ;
@@ -378,14 +363,8 @@ data intermediatefile_4;
 	baseline_dt = max(of regstartdate nl_dt);
 	if baseline_dt < '1DEC2007'd then baseline_dt = '1DEC2007'd;
 
-
-
-	*Only include people w at least  365 days of continuous enrollment;
-	days_diff = baseline_dt - regstartdate;
-	if days_diff >= 365;
-
 	*Drop variables no longer needed;
-	drop days_diff regstartdate nl_dt;
+	drop regstartdate nl_dt;
 
 	format baseline_dt ddmmyy10.;
 
@@ -402,12 +381,13 @@ run;
 
 
 proc sql;
-	create table linked_nl_cohort as
+	create table linked_bph_cohort as
 	select bc.*
-	from output.linkage_character as lc
-	inner join intermediatefile_4 as bc on strip(lc.patid) = strip(bc.patid)
-	where lsoa_e = 1 and hes_apc_e = 1;
-run;
+	from rawdata.linkage_eligibility as lc
+	inner join intermediatefile_4 as bc on lc.patid = bc.patid;
+	
+quit;
+
 
 	* 121475 patients;
 

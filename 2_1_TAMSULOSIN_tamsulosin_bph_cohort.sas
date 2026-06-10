@@ -43,19 +43,19 @@ run;
 	proc sql;
 	CREATE TABLE bph_drugs_magda AS
 	SELECT med.patid, 
-		   med.issuedate,
-		   med.quantity, 
+		   med.issuedate, 
 		   med.dosageid, 
 		   bphcod.exposure,
 		   bphcod.drugsubstancename,
 		   bphcod.ProdCodeId,
+		   bphcod.quantity,
 		   bphcod.mg_dose
 	FROM 
-		output.clinical AS med
+		output.drug AS med
 	INNER JOIN
 		codelist.bph_drugs_fixed AS bphcod
 		ON med.ProdCodeId = bphcod.ProdCodeId
-	WHERE med.quantity > 0;
+	WHERE bphcod.quantity > 0;
 quit;
 
 /**************************************************************************/
@@ -94,6 +94,14 @@ from bph_drugs_magda
 where issuedate < '31OCT2002'd;
 quit;
 
+
+proc sql;
+select count(*) as number
+from bph_drugs_magda
+where issuedate < '31OCT2002'd or issuedate > '30JUN2026'd;
+quit;
+
+
 /**************************************************************************/
 /* STEP 3: Subset data to only include valid prescriptions                */
 /*         (merging with base_cohort and applying study-end restriction 
@@ -102,16 +110,21 @@ quit;
 /* 1) Join with base_cohort so only patients in our main cohort remain.   */
 /* 2) Only keep prescriptions before March 31, 2023 and after cohort begins*/
 
+** NOTE: what is the best unrealistically recent date?; 
 
 PROC SQL;
 CREATE TABLE bph_tam AS
 	SELECT T.patid, T.issuedate, T.exposure, T.drugsubstancename, T.dosageid, T.quantity, T.mg_dose
 	FROM bph_drugs_magda AS T
 	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
-	WHERE T.issuedate > MDY(31,10,2002) and T.issuedate < MDY(12,31,2026) and T.quantity > 0 
+	WHERE T.issuedate > MDY(31,10,2002) and T.issuedate < MDY(06,30,2026) and T.quantity > 0 
 ORDER BY T.patid, T.issuedate; 
 quit;
 
+proc SQL;
+SELECT COUNT(distinct patid) as n
+FROM bph_tam;
+quit;
 
 /**************************************************************************/
 /* STEP 4: Add daily dosage information                                  */
