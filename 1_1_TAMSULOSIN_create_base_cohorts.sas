@@ -1,8 +1,12 @@
 
-** 	the Treat-PRYSM project 		**
-** 	by Sage Wyatt and Shahab Abtahi **
-** 	October 2025 - September 2026 	**
-**	Drug - Tamsulosin				**;
+/********************************************/
+** 	the Treat-PRYSM project 				**
+** 	by Sage Wyatt and Shahab Abtahi 		**
+** 	October 2025 - September 2026 			**
+**	Drug - Tamsulosin						**
+**											**
+**	File 1: Cohort selection and HES linkage**
+/********************************************/;
 
 
 libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
@@ -246,8 +250,7 @@ quit;
 data intermediatefile_2;
 	set intermediatefile_1;
 	baseline_dt = max(regstartdate, bph_dt);
-	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
-	drop regstartdate bph_dt; 
+	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd; 
 	format baseline_dt ddmmyy10.;
 run;
 
@@ -260,24 +263,6 @@ proc sql;
 	inner join intermediatefile_2 as bc on lc.patid = bc.patid;
 	
 quit;
-
-*where lsoa_e = 1 and hes_apc_e = 1;
-
-Proc freq data = rawdata.linkage_eligibility ;
-table hes_apc_e*lsoa_e ;
-run;
-
-
-	*Quick sanity check to see whether there are no duplicates;
-	*No duplicates! ;
-proc sql;
-	create table test as
-	select distinct patid
-	from linked_bph_cohort;
-run;
-
-proc contents data = test;
-run;
 
 proc SQL;
 	CREATE TABLE output.bph_cohort AS
@@ -304,6 +289,26 @@ proc SQL;
 	FROM output.bph_cohort AS bc
 	WHERE aSAH_gp_dt IS NOT NULL;
 quit;
+
+
+*where lsoa_e = 1 and hes_apc_e = 1;
+
+Proc freq data = rawdata.linkage_eligibility ;
+table hes_apc_e*lsoa_e ;
+run;
+
+
+	*Quick sanity check to see whether there are no duplicates;
+	*No duplicates! ;
+proc sql;
+	create table test as
+	select distinct patid
+	from linked_bph_cohort;
+run;
+
+proc contents data = test;
+run;
+
 
 *******************************************************************************
 
@@ -363,9 +368,6 @@ data intermediatefile_4;
 	baseline_dt = max(of regstartdate nl_dt);
 	if baseline_dt < '1DEC2007'd then baseline_dt = '1DEC2007'd;
 
-	*Drop variables no longer needed;
-	drop regstartdate nl_dt;
-
 	format baseline_dt ddmmyy10.;
 
 run;
@@ -381,7 +383,7 @@ run;
 
 
 proc sql;
-	create table linked_bph_cohort as
+	create table linked_nl_cohort as
 	select bc.*
 	from rawdata.linkage_eligibility as lc
 	inner join intermediatefile_4 as bc on lc.patid = bc.patid;
@@ -389,21 +391,6 @@ proc sql;
 quit;
 
 
-	* 121475 patients;
-
-proc contents data = linked_nl_cohort;
-run;
-
-	*Quick sanity check to see whether there are no duplicates ;
-	*No duplicates! ;
-proc sql;
-	create table test as
-	select distinct patid
-	from linked_nl_cohort;
-run;
-
-proc contents data = test;
-run;
 
 proc SQL;
 	CREATE TABLE output.nl_cohort AS
@@ -422,7 +409,24 @@ SELECT COUNT(*) FROM output.nl_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
+*SANITY CHECKS *;
 
+
+	* 121475 patients;
+
+proc contents data = linked_nl_cohort;
+run;
+
+	*Quick sanity check to see whether there are no duplicates ;
+	*No duplicates! ;
+proc sql;
+	create table test as
+	select distinct patid
+	from linked_nl_cohort;
+run;
+
+proc contents data = test;
+run;
 
 ***********************************************;
 ************** EXPORTING PATIDS ***************;
