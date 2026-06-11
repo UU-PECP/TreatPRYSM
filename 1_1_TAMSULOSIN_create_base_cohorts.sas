@@ -258,11 +258,16 @@ run;
 
 proc sql;
 	create table linked_bph_cohort as
-	select bc.*
-	from rawdata.linkage_eligibility as lc
-	inner join intermediatefile_2 as bc on lc.patid = bc.patid;
+	select bc.* , lc.linkyear, lc.lsoa_e, lc.hes_apc_e
+	from intermediatefile_2 as bc 
+	left outer join rawdata.linkage_eligibility as lc on bc.patid = lc.patid;
 	
 quit;
+
+*check*;
+proc freq data = linked_bph_cohort;
+	tables hes_apc_e;
+	run;
 
 proc SQL;
 	CREATE TABLE output.bph_cohort AS
