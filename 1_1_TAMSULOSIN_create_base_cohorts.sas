@@ -11,8 +11,7 @@
 
 libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
 libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-libname codelist "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\3_MagdasCodes";
-
+libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\Codelists";
 options fullstimer;
 
 
@@ -204,6 +203,7 @@ quit;
 * STEP 5: Add information on bph and baseline date;
 
 	*Get first bph date for each patient before end of study period;
+	*NOTE: generates 54 patients with missing bph dates not in initial cohort file;
 
 proc sql;
 	CREATE TABLE output.bph_cases AS
@@ -214,18 +214,14 @@ proc sql;
 	INNER JOIN
 		codelist.bph AS bph
 		ON cli.medcodeId = bph.medcode
-        WHERE cli.obsdate < '31MAR2023'd
+        WHERE cli.obsdate < '31MAR2025'd
 	GROUP BY cli.patid;
 quit;
 
 
 
-	*Add bph date to base cohort;
-	* NOTE: Why do we lose about 200 patients here? 264340 at previous substep, and 264203 here;
-	* Is it because some of the patients in the clinical file are not in the patient file?;
-
 PROC SQL;
-	CREATE TABLE intermediatefile_1 AS
+	CREATE TABLE output.BPH_initial AS
 	SELECT
 		bc.patid, 
 		bc.gender,
@@ -243,51 +239,165 @@ PROC SQL;
 quit;
 
 
-	*Define baseline_dt as bph date or registration start date, whichever is most recent, 
-	 if patients enter the cohort before study period begins, then study period beginning October 31 2002 is their baseline date
-	 and if the registration start date happens less than 365 days before the baseline date, then the patients are not included;
-
-data intermediatefile_2;
-	set intermediatefile_1;
-	baseline_dt = max(regstartdate, bph_dt);
-	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd; 
-	format baseline_dt ddmmyy10.;
-run;
 
 * STEP 6: Extract patids of patients with linked HES data;
 
+* PROC SQL * ;
+
 proc sql;
-	create table linked_bph_cohort as
-	select bc.* , lc.linkyear, lc.lsoa_e, lc.hes_apc_e
-	from intermediatefile_2 as bc 
-	left outer join rawdata.linkage_eligibility as lc on bc.patid = lc.patid;
-	
+	create table output.linked_bph_cohort as
+	select a.* , b.linkyear, b.lsoa_e, b.hes_apc_e
+	from output.BPH_initial as a 
+	left outer join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid;
 quit;
 
 *check*;
-proc freq data = linked_bph_cohort;
-	tables hes_apc_e;
+proc freq data = output.linked_bph_cohort;
+	tables hes_apc_e /MISSING;
 	run;
+*******;
+
+proc sql;
+create table output.exclude_bph_unlinked AS
+select *
+from output.linked_bph_cohort
+where lsoa_e = 1 and hes_apc_e = 1;
+quit;
+
+
+* RETRIEVE aSAH CASES *;
 
 proc SQL;
 	CREATE TABLE output.bph_cohort AS
 	SELECT bc.*, 
 		   aSAH.aSAH_dt as aSAH_gp_dt
-	FROM linked_bph_cohort AS bc
+	FROM output.exclude_bph_unlinked AS bc
 	LEFT OUTER JOIN output.aSAH_gp AS aSAH ON bc.patid = aSAH.patid;
 quit;
 
-proc contents data = output.bph_cohort;
-run;
 
-* 1550 aSAH cases in this cohort;
+* 3206 aSAH cases in this cohort;
 proc SQL;
 SELECT COUNT(*) FROM output.bph_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
-* SANITY CHECK *;
 
+*******************************************************************************
+
+********************** NEPHROLITHIASIS COHORT GENERATION **********************
+
+*******************************************************************************;
+
+*NOTE: contains several intermediate files in work library that will be overwritten later in nephrolithiasis cohort generation;
+* STEP 7: Add information on bph and baseline date;
+
+	*Get first nl date for each patient before end of study period;
+
+proc sql;
+      CREATE TABLE output.nl_cases AS
+      SELECT
+          cli.patid, MIN(cli.obsdate) AS nl_dt format=ddmmyy10.
+      FROM
+          output.clinical AS cli
+      INNER JOIN
+          codelist.nephrolithiasis AS nl
+          ON cli.medcodeId = nl.medcode
+          WHERE cli.obsdate < '31MAR2025'd
+      GROUP BY cli.patid;
+quit;
+
+
+
+PROC SQL;
+	CREATE TABLE NL_initial AS
+	SELECT
+		bc.patid,
+		bc.yob,
+		bc.cprd_ddate,
+		bc.regstartdate, 
+		bc.regenddate,
+		nl_coh.nl_dt
+	FROM
+		output.initial_cohort AS bc
+	LEFT OUTER JOIN
+		output.nl_cases AS nl_coh
+		ON bc.patid = nl_coh.patid
+	WHERE nl_coh.nl_dt IS NOT NULL;
+	*without the above line, could this step be replaced by an inner join? ;
+quit;
+
+
+* STEP 8: Extract patids of patients with linked HES data;
+
+
+proc sql;
+	create table output.linked_nl_cohort as
+	select bc.* , lc.linkyear, lc.lsoa_e, lc.hes_apc_e
+	from output.NL_baseline as bc 
+	left outer join rawdata.aurum_eligibility_jan2026 as lc on bc.patid = lc.patid;
+	
+quit;
+
+*check*;
+proc freq data = output.linked_nl_cohort;
+	tables hes_apc_e /MISSING;
+	run;
+
+*******;
+
+proc sql;
+create table output.exclude_nl_unlinked AS
+select *
+from output.linked_nl_cohort
+where lsoa_e = 1 and hes_apc_e = 1;
+quit;
+
+
+
+* RETRIEVE aSAH CASES *;
+
+proc SQL;
+	CREATE TABLE output.nl_cohort AS
+	SELECT bc.*, 
+		   aSAH.aSAH_dt as aSAH_gp_dt
+	FROM output.exclude_nl_unlinked AS bc
+	LEFT OUTER JOIN output.aSAH_gp AS aSAH ON bc.patid = aSAH.patid;
+quit;
+
+proc contents data = output.nl_cohort;
+run;
+
+* 1084 aSAH cases in this cohort;
+proc SQL;
+SELECT COUNT(*) FROM output.nl_cohort
+WHERE aSAH_gp_dt IS NOT NULL;
+quit;
+
+***********************************************;
+************** EXPORTING PATIDS ***************;
+***********************************************;
+
+* STEP 10: create external files;
+
+* final count: 604422 patients;
+proc export data = output.nl_cohort (keep = patid)
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_NL.csv"
+dbms=csv
+replace;
+run;
+
+*final count: 243789 patients;
+proc export data = output.bph_cohort (keep = patid)
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
+dbms=csv
+replace;
+run;
+
+
+***********************************************;
+**************** SANITY CHECKS ****************;
+***********************************************;
 proc SQL;
 	CREATE TABLE asahonly AS
 	SELECT bc.*
@@ -315,138 +425,3 @@ proc contents data = test;
 run;
 
 
-*******************************************************************************
-
-********************** NEPHROLITHIASIS COHORT GENERATION **********************
-
-*******************************************************************************;
-
-*NOTE: contains several intermediate files in work library that will be overwritten later in nephrolithiasis cohort generation;
-* STEP 7: Add information on bph and baseline date;
-
-	*Get first nl date for each patient before end of study period;
-
-proc sql;
-      CREATE TABLE output.nl_cases AS
-      SELECT
-          cli.patid, MIN(cli.obsdate) AS nl_dt format=ddmmyy10.
-      FROM
-          output.clinical AS cli
-      INNER JOIN
-          codelist.nephrolithiasis AS nl
-          ON cli.medcodeId = nl.medcode
-          WHERE cli.obsdate < '31MAR2023'd
-      GROUP BY cli.patid;
-quit;
-
-
-
-PROC SQL;
-	CREATE TABLE intermediatefile_3 AS
-	SELECT
-		bc.patid,
-		bc.yob,
-		bc.cprd_ddate,
-		bc.regstartdate, 
-		bc.regenddate,
-		nl_coh.nl_dt
-	FROM
-		output.initial_cohort AS bc
-	LEFT OUTER JOIN
-		output.nl_cases AS nl_coh
-		ON bc.patid = nl_coh.patid
-	WHERE nl_coh.nl_dt IS NOT NULL;
-	*without the above line, could this step be replaced by an inner join? ;
-quit;
-
-	*Define baseline_dt as nl date or registration start date, whichever is most recent, 
-	 if patients enter the cohort before study period begins, then study period beginning October 31 2002 is their baseline date
-	 and if the registration start date happens less than 365 days before the baseline date, then the patients are not included;
-
-	*NOTE: if we only have nl patients I don't see how any patient could be registered after their nl diagnosis;
-
-data intermediatefile_4;
-	set intermediatefile_3;
-
-	*Define baseline dt as first date of 01-12-2007, registration, or nephrolithiasis diagnosis;
-	*do we need this step?;
-	baseline_dt = max(of regstartdate nl_dt);
-	if baseline_dt < '1DEC2007'd then baseline_dt = '1DEC2007'd;
-
-	format baseline_dt ddmmyy10.;
-
-run;
-
-proc contents data = intermediatefile_4;
-run;
-
-* STEP 8: Extract patids of patients with linked HES data;
-
-	*must strip both patids, otherwise outputs 0 observations;
-	* 340378 patients;
-	* NOTE: should we do other basic exclusions here before we extract the patids?;
-
-
-proc sql;
-	create table linked_nl_cohort as
-	select bc.*
-	from rawdata.linkage_eligibility as lc
-	inner join intermediatefile_4 as bc on lc.patid = bc.patid;
-	
-quit;
-
-
-
-proc SQL;
-	CREATE TABLE output.nl_cohort AS
-	SELECT bc.*, 
-		   aSAH.aSAH_dt as aSAH_gp_dt
-	FROM linked_nl_cohort AS bc
-	LEFT OUTER JOIN output.aSAH_gp AS aSAH ON bc.patid = aSAH.patid;
-quit;
-
-proc contents data = output.nl_cohort;
-run;
-
-* 529 aSAH cases in this cohort (597 with incorrect codes from 01-06-2026);
-proc SQL;
-SELECT COUNT(*) FROM output.nl_cohort
-WHERE aSAH_gp_dt IS NOT NULL;
-quit;
-
-*SANITY CHECKS *;
-
-
-	* 121475 patients;
-
-proc contents data = linked_nl_cohort;
-run;
-
-	*Quick sanity check to see whether there are no duplicates ;
-	*No duplicates! ;
-proc sql;
-	create table test as
-	select distinct patid
-	from linked_nl_cohort;
-run;
-
-proc contents data = test;
-run;
-
-***********************************************;
-************** EXPORTING PATIDS ***************;
-***********************************************;
-
-* STEP 9: create external files;
-
-proc export data = output.nl_cohort (keep = patid)
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_NL.csv"
-dbms=csv
-replace;
-run;
-
-proc export data = output.bph_cohort (keep = patid)
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
-dbms=csv
-replace;
-run;
