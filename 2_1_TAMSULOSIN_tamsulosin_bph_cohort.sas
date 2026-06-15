@@ -1,12 +1,12 @@
 
-/********************************************/
-** 	the Treat-PRYSM project 				**
-** 	by Sage Wyatt and Shahab Abtahi 		**
-** 	October 2025 - September 2026 			**
-**	Drug - Tamsulosin						**
-**											**
-**	File 2.1: Exposure Generation for BPH	**
-/********************************************/;
+/************************************************/
+** 	the Treat-PRYSM project 					**
+** 	by Sage Wyatt, Jos Kanning, & Shahab Abtahi **
+** 	October 2025 - September 2026 				**
+**	Drug - Tamsulosin							**
+**												**
+**	File 2.1: Exposure Generation for BPH		**
+/************************************************/;
 
 
 /**************************************************************************/
@@ -46,12 +46,41 @@ quit;
 
 
 
-/**************************************************************************/
+/****************************************************************************/
 /* STEP 2: Join with base_cohort so only patients in our main cohort remain.*/
-/**************************************************************************/
+/****************************************************************************/
 /* calculates variable calc_dose as daily dose, which has strong correlation to daily_dose in 
 common dosages file (see sanity check), though daily_dose in common dosages file
 is not available for all records */
+/* For records with duration < 7, assign 1 daily dose, and treatment duration equal to quantity */
+/* For unusually high durations, assign median duration (28 days)*/
+
+data bph_tam_cleaning1;
+set output.bph_drugs;
+if duration < 7 then duration = quantity;
+else if duration > 365 then duration = 28;
+else duration = duration;
+run;
+
+proc sort data = bph_tam_cleaning1;
+by duration;
+run;
+
+data bph_tam_cleaning2;
+set bph_tam_cleaning1;
+calc_dose = round(quantity / duration);
+run;
+
+data bph_tam_cleaning3;
+set bph_tam_cleaning2;
+if calc_dose = . then calc_dose = 1;
+else if calc_dose < 1 then calc_dose = 0.5;
+run;
+		
+data bph_tam_cleaning4;
+set bph_tam_cleaning3;
+mean_daily_dose = mg_value * calc_dose;
+run;	
 
 PROC SQL;
 CREATE TABLE bph_tam AS
@@ -64,29 +93,13 @@ T.quantity,
 T.duration,
 T.prodcodeid, 
 T.mg_dose,
-round(T.quantity / T.duration) as calc_dose,
+T.mean_daily_dose,
+T.calc_dose,
 BC.regstartdate
-	FROM output.bph_drugs AS T
+	FROM bph_tam_cleaning4 AS T
 	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
-ORDER BY T.patid, T.issuedate; 
+ORDER BY T.duration, T.patid, T.issuedate; 
 quit;
-
-
-/* calculate mean_daily_dose.*/
-
-
-proc sql;
-	create table bph_tam_dose as
-	select * ,
-		   mg_dose * CASE 
-							WHEN calc_dose IS NULL THEN 1 
-							WHEN calc_dose < 0 THEN 0.5 
-							ELSE calc_dose 
-						END AS mean_daily_dose
-	from bph_tam
-	ORDER BY patid, issuedate;
-quit;
-
 
 
 /**************************************************************************/
@@ -104,7 +117,7 @@ proc sql;
 	create table PrevalentUsers as
 	select distinct d1.patid
 	from output.bph_cohort d1
-		inner join bph_tam_dose d2
+		inner join bph_tam d2
 		on d1.patid = d2.patid
 	where d2.issuedate between intnx('year', d1.bph_dt, -1) and d1.bph_dt - 1;
 quit;
@@ -122,9 +135,10 @@ proc sql;
 		   d2.mean_daily_dose,
 		   d2.exposure,
 		   d2.prodcodeid,
-		   d2.quantity
+		   d2.quantity,
+		   d2.drugsubstancename
 	from output.bph_cohort d1
-		inner join bph_tam_dose d2
+		inner join bph_tam d2
 		on d1.patid = d2.patid
 	where not exists (
 		select 1
@@ -163,25 +177,13 @@ proc sql;
 		   p.prodcodeid,
 		   p.bph_dt,
 		   e.earliest_rx_date,
-		   p.regstartdate
+		   p.regstartdate,
+		   p.drugsubstancename
 	from output.Rx_PostStart as p
 		inner join output.BphEarliestDate as e
 		on p.patid = e.patid
 	where p.issuedate = e.earliest_rx_date;
 quit;
-
-
-
-proc sort data = output.BphEarliestDate;
-by patid;
-run;
-
-proc sql;
-create table test AS
-select *
-from output.Rx_PostStart 
-	where patid not in(select patid from output.EarliestRxBphAll);
-	quit;
 
 
 /**************************************************************************/
@@ -214,6 +216,7 @@ proc sql;
 		   prodcodeid, 
 		   duration,
 		   bph_dt,
+		   drugsubstancename,
 		   regstartdate
 	from EarliestRxBph_Filtered
 	group by patid, exposure
@@ -279,15 +282,19 @@ quit;
 
 proc sql;
 	create table output.BphDrugAtc_1 as /* change to _2, _3, and _4 per file */
-	select *
+	select b.*, a.ATC
 	from output.BphIndexDrug b
-		left outer join rawdata.atc_a10a as a
+		left  outer join rawdata.product_aurum_atc as a
 		on b.prodcodeid = a.prodcodeid;
 quit;
 
+proc sort data = output.BphDrugAtc_1;
+by duration;
+run;
 
-*** ^^^ Run this 4 times for each of the 4 drugg issue files and 
-then string together at the end ***;
+*****SECOND FILE*****
+
+
 
 /**************************************************************************/
 /* STEP 10: SANITY TESTING */
@@ -398,6 +405,15 @@ run;
 proc freq data = EarliestRx_washout;
 tables duration;
 run;
+
+proc sort data = output.bph_drugs;
+by duration patid issuedate;
+run;
+
+proc sql;
+select median(duration) into :med_duration
+from output.bph_drugs;
+quit;
 
 ************************************** NEPHROLITHIASIS COHORT ****************************************;
 
