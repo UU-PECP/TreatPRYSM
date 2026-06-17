@@ -83,13 +83,14 @@ run;
 
 *Step 2; 
 /* Exclude patients from wales*/
-
+/* extract lcd */
 /*Import practice records */
 
 proc sql;
 	CREATE TABLE practice_1 AS
 	SELECT
 		region,
+		lcd,
 		pracid
 	FROM rawdata.practice_1; 
 quit;
@@ -99,6 +100,7 @@ proc sql;
 	CREATE TABLE practice_2 AS
 	SELECT
 		region,
+		lcd,
 		pracid
 	FROM rawdata.practice_2; 
 quit;
@@ -107,6 +109,7 @@ proc sql;
 	CREATE TABLE practice_3 AS
 	SELECT
 		region,
+		lcd,
 		pracid
 	FROM rawdata.practice_3; 
 quit;
@@ -115,6 +118,7 @@ proc sql;
 	CREATE TABLE practice_4 AS
 	SELECT
 		region,
+		lcd,
 		pracid
 	FROM rawdata.practice_4; 
 quit;
@@ -129,7 +133,7 @@ set practice_1
 run;
 
 proc sql;
-CREATE TABLE initial_cohort AS
+CREATE TABLE output.initial_cohort AS
 SELECT
 		coh.patid,
 		coh.gender,
@@ -137,7 +141,8 @@ SELECT
 		coh.regstartdate, 
 		coh.cprd_ddate, 
 		coh.regenddate,
-		coh.pracid
+		coh.pracid,
+		pra.lcd
 FROM output.initial_cohort AS coh
 LEFT OUTER JOIN
 		output.practice AS pra
@@ -226,6 +231,7 @@ PROC SQL;
 		bc.patid, 
 		bc.gender,
 		bc.yob,
+		bc.lcd,
 		bc.cprd_ddate,
 		bc.regstartdate, 
 		bc.regenddate,
@@ -265,7 +271,7 @@ where lsoa_e = 1 and hes_apc_e = 1;
 quit;
 
 
-* RETRIEVE aSAH CASES *;
+* STEP 7: RETRIEVE aSAH CASES *;
 
 proc SQL;
 	CREATE TABLE output.bph_cohort AS
@@ -283,6 +289,16 @@ WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
 
+* STEP 8: Add Baseline date *;
+
+data output.bph_cohort;
+	set output.bph_cohort;
+
+	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
+	baseline_dt = max(of regstartdate bph_dt);
+	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
+	run;
+
 *******************************************************************************
 
 ********************** NEPHROLITHIASIS COHORT GENERATION **********************
@@ -290,7 +306,7 @@ quit;
 *******************************************************************************;
 
 *NOTE: contains several intermediate files in work library that will be overwritten later in nephrolithiasis cohort generation;
-* STEP 7: Add information on bph and baseline date;
+* STEP 9: Add information on bph and baseline date;
 
 	*Get first nl date for each patient before end of study period;
 
@@ -317,6 +333,7 @@ PROC SQL;
 		bc.cprd_ddate,
 		bc.regstartdate, 
 		bc.regenddate,
+		bc.lcd,
 		nl_coh.nl_dt
 	FROM
 		output.initial_cohort AS bc
@@ -328,13 +345,13 @@ PROC SQL;
 quit;
 
 
-* STEP 8: Extract patids of patients with linked HES data;
+* STEP 10: Extract patids of patients with linked HES data;
 
 
 proc sql;
 	create table output.linked_nl_cohort as
 	select bc.* , lc.linkyear, lc.lsoa_e, lc.hes_apc_e
-	from output.NL_baseline as bc 
+	from output.nl_initial as bc 
 	left outer join rawdata.aurum_eligibility_jan2026 as lc on bc.patid = lc.patid;
 	
 quit;
@@ -355,7 +372,7 @@ quit;
 
 
 
-* RETRIEVE aSAH CASES *;
+* STEP 11: RETRIEVE aSAH CASES *;
 
 proc SQL;
 	CREATE TABLE output.nl_cohort AS
@@ -374,11 +391,21 @@ SELECT COUNT(*) FROM output.nl_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
+* STEP 12: Add Baseline date *;
+
+data output.bph_cohort;
+	set output.bph_cohort;
+
+	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
+	baseline_dt = max(of regstartdate nl_dt);
+	if baseline_dt < '01DEC2007'd then baseline_dt = '01DEC2007'd;
+	run;
+
 ***********************************************;
 ************** EXPORTING PATIDS ***************;
 ***********************************************;
 
-* STEP 10: create external files;
+* STEP 13: create external files;
 
 * final count: 604422 patients;
 proc export data = output.nl_cohort (keep = patid)
