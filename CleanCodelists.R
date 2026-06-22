@@ -12,25 +12,24 @@ options(scipen = 999)
           #- NewFilePath. Where would you like to save the clean file? What would you like it to be called?
           #- choose either CPRD gold or CPRD Aurum, both found in F: folder
 
-      OriginalFilePath <- "C:\\Users\\Wyatt003\\Downloads\\PH235_ver_470_codelists_20260528T123038.csv"
-      LinkedIds <- c("concept_id" = "CleansedReadCode")
-      NewFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\neuropathy_codelist.csv"
+      OriginalFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\copd.txt"
+      LinkedIds <- c("readcode" = "CleansedReadCode")
+      NewFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\copd.txt"
       Codebrowser <- read_delim("F:\\Research Information\\CPRD\\CPRD_CodeBrowser\\CPRD_CodeBrowser_Aurum\\CPRDAurumMedical.txt", delim = "\t")
       
     ### Stable Macro
 
-      #OriginalFile <- read_delim(OriginalFilePath, delim = "\t")
-      OriginalFile <- read.csv(OriginalFilePath)
+      OriginalFile <- read_delim(OriginalFilePath, delim = "\t")
+      #OriginalFile <- read.csv(OriginalFilePath)
       
-      OriginalFile <- OriginalFile %>% filter(str_detect(coding_system, "Read") == TRUE)
+      #OriginalFile <- OriginalFile %>% filter(str_detect(coding_system, "Read") == TRUE)
       
       LinkedToAurum <- inner_join(OriginalFile, Codebrowser, by = LinkedIds, keep = TRUE, suffix = c(".og", ""))
       
       CleanLinkedCodes <- LinkedToAurum %>% 
         select(MedCodeId, Observations, OriginalReadCode, Term) %>% 
-        relocate(MedCodeId, Observations, OriginalReadCode, Term) %>% 
-        filter(!is.na(clinicalevents)) %>% 
-        distinct(medcode, .keep_all = TRUE)
+        relocate(MedCodeId, Observations, OriginalReadCode, Term) %>%
+        distinct(MedCodeId, .keep_all = TRUE)
 
         write.table(CleanLinkedCodes, NewFilePath, sep = "\t", row.names = FALSE)
 

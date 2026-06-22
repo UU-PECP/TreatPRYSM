@@ -5,7 +5,7 @@
 ** 	October 2025 - September 2026 				**
 **	Drug - Tamsulosin							**
 **												**
-**	File 2.1: Exposure Generation for BPH		**
+**	File 2.2: Exposure Generation for NL		**
 /************************************************/;
 
 /**************************************************************************/
@@ -14,38 +14,43 @@
 
 libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
 libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-libname codelist "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\3_MagdasCodes";
+libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\Codelists";
 
 options fullstimer; /* Display detailed resource usage info in log */
 
-************************************** BPH COHORT ****************************************;
+
+
+************************************** NEPHROLITHIASIS COHORT ****************************************;
+
+
+
 %macro drugdata(in =, out=);
 
 /**************************************************************************/
-*** Step 1: Extract BPH drug records;
+*** Step 1: Extract NL drug records;
 /**************************************************************************/
 
 proc sql;
-	CREATE TABLE output.bph_drugs AS
+	CREATE TABLE output.nl_drugs AS
 	SELECT med.patid, 
 		   med.issuedate, 
 		   med.dosageid, 
 		   med.quantity,
 		   med.duration,
-		   bphcod.drugsubstancename,
-		   bphcod.ProdCodeId,
-		   bphcod.mg_dose
+		   nlcod.drugsubstancename,
+		   nlcod.ProdCodeId,
+		   nlcod.mg_dose
 	FROM 
-		 &in AS med /*Change to include all 4 files */
+		&in AS med /*Change to include all 4 files */
 	INNER JOIN
-		codelist.bph_drugs_fixed AS bphcod
-		ON med.ProdCodeId = bphcod.ProdCodeId;
-quit;
+		codelist.nl_drugs AS nlcod
+		ON med.ProdCodeId = nlcod.ProdCodeId;
+	quit;
 
 /* HOW MANY PATIENTS */
 proc sql;
-select count(distinct patid) as "Step 1: bph drugs"n
-from output.bph_drugs
+select count(distinct patid) as "Step 1: nl drugs"n
+from output.nl_drugs
 quit;
 
 
@@ -58,44 +63,43 @@ is not available for all records */
 /* For records with duration < 7, assign 1 daily dose, and treatment duration equal to quantity */
 /* For unusually high durations, assign median duration (28 days)*/
 
-data bph_tam_cleaning1;
-set output.bph_drugs;
+data nl_tam_cleaning1;
+set output.nl_drugs;
 if quantity < 1 AND duration < 7 then duration = 1;
 else if quantity >= 1 AND duration < 7 then duration = quantity;
 else if duration > 365 then duration = 30;
 run;
 
-proc sort data = bph_tam_cleaning1;
+proc sort data = nl_tam_cleaning1;
 by duration;
 run;
 
-data bph_tam_cleaning2;
-set bph_tam_cleaning1;
+data nl_tam_cleaning2;
+set nl_tam_cleaning1;
 calc_dose = round(quantity / duration);
 run;
 
-data bph_tam_cleaning3;
-set bph_tam_cleaning2;
+data nl_tam_cleaning3;
+set nl_tam_cleaning2;
 if calc_dose = . then calc_dose = 1;
 else if calc_dose < 1 then calc_dose = 0.5;
 run;
 		
-data bph_tam_cleaning4;
-set bph_tam_cleaning3;
+data nl_tam_cleaning4;
+set nl_tam_cleaning3;
 mean_daily_dose = mg_dose * calc_dose;
 run;	
 
 /* HOW MANY PATIENTS */
 proc sql;
 select count(distinct patid) as "Step 2: new variables"n
-from bph_tam_cleaning4
+from nl_tam_cleaning4
 quit;
 
 PROC SQL;
-CREATE TABLE bph_tam AS
-	SELECT T.patid, 
+CREATE TABLE nl_tam AS
+	SELECT  
 T.issuedate, 
-T.exposure, 
 T.drugsubstancename, 
 T.dosageid, 
 T.quantity,
@@ -104,17 +108,18 @@ T.prodcodeid,
 T.mg_dose,
 T.mean_daily_dose,
 T.calc_dose,
-BC.regstartdate
-	FROM bph_tam_cleaning4 AS T
-	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
-ORDER BY T.duration, T.patid, T.issuedate; 
+BC.regstartdate,
+BC.patid,
+BC.nl_dt
+	FROM output.nl_cohort AS BC 
+	LEFT OUTER JOIN nl_tam_cleaning4 AS T ON BC.patid = T.patid; 
 quit;
 
 
 /* HOW MANY PATIENTS */
 proc sql;
-select count(distinct patid) as "Step 2: bphtam join to base"n
-from bph_tam
+select count(distinct patid) as "Step 2: nltam join to base"n
+from nl_tam
 quit;
 
 /**************************************************************************/
@@ -122,15 +127,15 @@ quit;
 /**************************************************************************/
 /* 'Prevalent users' are those who had a drug prescription 1 year before   */
 /* their baseline date. We identify them by comparing issue date with the  */
-/* bph_dt in base_cohort. */
+/* nl_dt in base_cohort. */
 /* second step removes identified prevalent users from main dataset */
 
 
 proc sql;
 	create table PrevalentUsers as
 	select distinct d1.patid
-	from output.bph_cohort d1
-		inner join bph_tam d2
+	from output.nl_cohort d1
+		inner join nl_tam d2
 		on d1.patid = d2.patid
 	where d2.issuedate between intnx('year', d1.baseline_dt, -1) and d1.baseline_dt - 1;
 quit;
@@ -146,26 +151,24 @@ quit;
 /* We only keep prescriptions dated on or after baseline.             */
 
 ** lose 30 thousand patients here, but seems realistic;
-** NOTE: this is runnign really slowly **;
+** NOTE: this is running really slowly **;
 proc sql;
 	create table output.Rx_PostStart as
 	select d1.*,
 		   d2.issuedate,
 		   d2.duration,
 		   d2.mean_daily_dose,
-		   d2.exposure,
 		   d2.prodcodeid,
 		   d2.quantity,
 		   d2.drugsubstancename
-	from output.bph_cohort d1
-		inner join bph_tam d2
+	from output.nl_cohort d1
+		left outer join nl_tam d2
 		on d1.patid = d2.patid
 	where not exists (
 		select 1
 		from PrevalentUsers p
 		where p.patid = d1.patid
 		)
-	and d2.issuedate >= d1.baseline_dt
 	;
 quit;
 
@@ -175,95 +178,93 @@ select count(distinct patid) as "Step 3: removing prevalent users"n
 from output.Rx_PostStart
 quit;
 
+
+data rx_post_cleaning;
+set output.Rx_PostStart;
+druguse = 1;
+if issuedate = . then druguse = 0;
+if issuedate = . then issuedate = nl_dt;
+run;
+
+
+/* HOW MANY NON-TAMSULOSIN RECORDS */
+proc freq data = rx_post_cleaning;
+tables druguse /MISSING;
+run;
+
+/* HOW MANY PATIENTS */
+proc sql;
+select count(distinct patid) as "Step 3: issuedate > baseline"n
+from rx_post_cleaning
+quit;
+
+proc freq data = rx_post_cleaning;
+tables drugsubstancename /MISSING;
+run;
+
 /**************************************************************************/
 /* STEP 4: Identify earliest prescription date for each patient           */
 /**************************************************************************/
 /* Finds the minimum (earliest) eventdate among the valid prescriptions.  */
 
 proc sql;
-	create table output.BphEarliestDate as
+	create table output.NlEarliestDate as
 	select patid,
 		   min(issuedate) as earliest_rx_date format = ddmmyy10.
-	from output.Rx_PostStart
+	from rx_post_cleaning
 	group by patid;
 quit;
 
 
 /* 1) We only keep rows where issuedate = earliest_rx_date.               */
 /* 2) We call this 'EarliestRxAll'.                                       */
-/* 3) If multiple rows share the same earliest date for a patient, we     */
-/*    handle that in the subsequent step.                                 */
+/* 3) We assign index_date                               */
 proc sql;
-	create table output.EarliestRxBphAll as
+	create table output.EarliestRxNlAll as
 	select p.patid,
-		   p.exposure,
 		   p.issuedate,
 		   p.duration,
 		   p.prodcodeid,
-		   p.bph_dt,
+		   p.nl_dt,
 		   p.baseline_dt,
 		   e.earliest_rx_date,
 		   p.regstartdate,
 		   p.drugsubstancename
-	from output.Rx_PostStart as p
-		inner join output.BphEarliestDate as e
+	from rx_post_cleaning as p
+		inner join output.NlEarliestDate as e
 		on p.patid = e.patid
 	where p.issuedate = e.earliest_rx_date;
 quit;
 
-
 /*HOW MANY PATIENTS*/
 proc sql;
 select count(distinct patid) as "Step 4: First issue date"n
-from output.EarliestRxBphAll
+from output.EarliestRxNlAll
 quit;
 
-/**************************************************************************/
-/* STEP 5: Exclude patients who have more than one record on earliest Rx  */
-/**************************************************************************/
-/* If a patient has > 1 row on the earliest date (possibly multiple drugs),*/
-/* we remove them so each patient has exactly one earliest Rx.            */
-proc sql;
-	create table ExcludeMulti as
-	select patid
-	from output.EarliestRxBphAll
-	group by patid
-	having count(distinct exposure) > 1  /* More than 1 unique exposure => Exclude */
-	;
-quit;
+proc freq data = output.EarliestRxNlAll;
+tables drugsubstancename /MISSING;
+run;
+
+/* excluding prescriptions not relevant to nl diagnosis, before or > 1 month later */
+*** Lost 20 thousand patients, significant but reasonable ***;
 
 proc sql;
-	create table EarliestRxBph_Filtered as
+	create table EarliestRxNl_Filtered as
 	select *
-	from output.EarliestRxBphAll
-	where patid not in (select patid from output.ExcludeMulti);
-quit;
-
-
-/*HOW MANY PATIENTS*/
-proc sql;
-select count(distinct patid) as "Step 5: multi-drug"n
-from EarliestRxBph_Filtered
+	from output.EarliestRxNlAll
+	where earliest_rx_date - nl_dt <= 30
+	and earliest_rx_date >= nl_dt;
 quit;
 
 proc sql;
-	create table EarliestRxBph_Filtered as
-	select distinct
-	       patid, 
-		   exposure, 
-		   earliest_rx_date,
-		   prodcodeid, 
-		   duration,
-		   bph_dt,
-		   baseline_dt,
-		   drugsubstancename,
-		   regstartdate
-	from EarliestRxBph_Filtered
-	group by patid, exposure
-	having duration = max(duration)  /* Prefer longest treatment if two prescriptions on same date */
-	;
+select count(distinct patid) as "Step 4: drug for nl"n
+from EarliestRxNl_Filtered 
 quit;
 
+proc freq data = EarliestRxNl_Filtered;
+tables drugsubstancename /MISSING;
+run;
 
 /**************************************************************************/
 /* STEP 7: Exclude if Follow-up period is less than 365 days  */
@@ -272,7 +273,7 @@ quit;
 PROC SQL;
 create table EarliestRx_washout AS
 select * 
-from EarliestRxBph_Filtered
+from EarliestRxNl_Filtered
 having earliest_rx_date - regstartdate > 365;
 quit;
 
@@ -281,6 +282,10 @@ proc sql;
 select count(distinct patid) as "Step 7: Washout exclusions"n
 from EarliestRx_washout
 quit;
+
+proc freq data = EarliestRx_washout;
+tables drugsubstancename /MISSING;
+run;
 
 **********;
 
@@ -296,7 +301,7 @@ proc sql;
 CREATE TABLE EarliestRx_aSah_Exclusion AS
 SELECT d1.* , d2.patid, d2.aSAH_gp_dt
 FROM EarliestRx_washout as d1
-INNER JOIN output.bph_cohort as d2 
+INNER JOIN output.nl_cohort as d2 
 ON d1.patid = d2.patid
 	WHERE d2.aSAH_gp_dt > earliest_rx_date or d2.aSAH_gp_dt is NULL;
 quit;
@@ -304,8 +309,12 @@ quit;
 /*HOW MANY PATIENTS*/
 proc sql;
 select count(distinct patid) as "Step 8: prior aSAH"n
-from EarliestRx_aSah_Exclusion 
+from EarliestRx_aSah_Exclusion; 
 quit;
+
+proc freq data = EarliestRx_aSah_Exclusion;
+tables drugsubstancename /MISSING;
+run;
 
 /**************************************************************************/
 /* STEP 9: Keep only the same drug as earliest for final prescription set */
@@ -315,12 +324,12 @@ quit;
 /* 2) This will be used for bridging (continuous coverage) analysis.      */
 
 proc sql;
-	create table output.BphIndexDrug as
+	create table output.NlIndexDrug as
 	select p.*
-	from output.Rx_PostStart p
+	from rx_post_cleaning p
 		inner join EarliestRx_aSah_Exclusion e
 		on p.patid = e.patid
-	where p.exposure = e.exposure
+	where p.drugsubstancename = e.drugsubstancename
 	  and p.issuedate >= e.earliest_rx_date
 	order by p.patid, p.issuedate;
 quit;
@@ -328,7 +337,7 @@ quit;
 /*HOW MANY PATIENTS*/
 proc sql;
 select count(distinct patid) as "Step 9: Rx b4 earliest"n
-from output.BphIndexDrug 
+from output.NlIndexDrug 
 quit;
 
 *** Link to ATC codes ***;
@@ -336,12 +345,12 @@ quit;
 proc sql;
 	create table &out as /* change to _2, _3, and _4 per file */
 	select b.*, a.ATC
-	from output.BphIndexDrug b
+	from output.NlIndexDrug b
 		left  outer join rawdata.product_aurum_atc as a
 		on b.prodcodeid = a.prodcodeid;
 quit;
 
-proc sort data = output.BphDrugAtc_4;
+proc sort data = &out;
 by duration;
 run;
 
@@ -352,183 +361,69 @@ run;
 /* STEP 10: COMBINE FILES */
 /**************************************************************************/
 
-%drugdata(in=rawdata.drugissue_1, out= output.bphdrugatc_1)
+%drugdata(in=rawdata.drugissue_1, out= output.nldrugatc_1)
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_2, out= output.bphdrugatc_2)
+%drugdata(in=rawdata.drugissue_2, out= output.nldrugatc_2)
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_3, out= output.bphdrugatc_3)
+%drugdata(in=rawdata.drugissue_3, out= output.nldrugatc_3)
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_4, out= output.bphdrugatc_4)
+%drugdata(in=rawdata.drugissue_4, out= output.nldrugatc_4)
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
 
-data output.all_bph_drugissue;
-set output.bphdrugatc_1
-output.bphdrugatc_2
-output.bphdrugatc_3
-output.bphdrugatc_4;
+data output.all_nl_drugissue;
+set output.nldrugatc_1
+output.nldrugatc_2
+output.nldrugatc_3
+output.nldrugatc_4;
 run;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as n
-from output.all_bph_drugissue
+select count(distinct patid) as "total count"n
+from output.all_nl_drugissue
 quit;
 
-proc sort data = output.all_bph_drugissue;
+proc sql;
+select count(distinct patid) as "total count"n
+from output.output.nldrugatc_4
+quit;
+
+proc sort data = output.all_nl_drugissue;
 by duration patid issuedate;
 run;
 
-*** how many records still have an odd duration?***;
+proc freq data = output.all_nl_drugissue;
+tables drugsubstancename /MISSING;
+run;
+
+*/ Is this analysis going to be possible ?/*;
 
 data test;
-set output.all_bph_drugissue;
-if duration < 7 then oddvalues = "TRUE";
-else if duration >= 7 then oddvalues = "FALSE";
+set output.all_nl_drugissue;
+if aSAH_gp_dt = . then aSAH = 0;
+if aSAH_gp_dt ne . then aSAH = 1;
+if drugsubstancename ne "Tamsulosin" and drugsubstancename ne "Analgesic" then drugsubstancename = "None";
 run;
 
-proc freq data = output.all_bph_drugissue;
-tables oddvalues;
-run; */ only 0.07*/;
-
-
-data output.all_bph_drugissue;
-set output.all_bph_drugissue;
-if duration < 7 then duration = 30;
+proc freq data = test;
+tables drugsubstancename * aSAH;
 run;
 
 
-
-/**************************************************************************/
-/* STEP 11: SANITY TESTING */
-/**************************************************************************/
-/* Checks steps throughout BPH document      */
-
-*check quantity *;
-
-proc freq data = bph_tam;
-	tables quantity / MISSING;
-	run;
-
-*****;
-
-proc SQL;
-SELECT COUNT(distinct patid) as n
-FROM bph_tam;
-quit;
-
-
-** determining how to deal with daily dose outside of common_dosage file **;
-
-proc sql;
-create table test as
-select BT.drugsubstancename, 
-BT.dosageid, 
-BT.quantity,
-BT.duration,
-CD.*, 
-BT.quantity / BT.duration as calc_dose
-from bph_tam as BT
-left outer join codelist.common_dosages as CD
-		on BT.dosageid = CD.dosageid;
-quit;
-
-proc means data = test mean n;
-class daily_dose;
-var calc_dose;
-run;
-
-*Based on these tests, quantity/duration is a good measure of daily dose;
-
-
-
-/* Quick check: Count unique patients */
-title "Numbers of unique ids in bph cohort";
-proc sql;
-  select count(distinct patid) as n_patid
-  from bph_tam_dose;
-quit;
-
-/* Check that there are no negative or zero durations */
-title "Numbers of people with 0 treatment duration";
-proc sql;
-  select count(*) as n_zero_treat
-  from bph_tam_dose
-  where treatment_duration <= 0;
-quit;
-
-
-/* Check the distribution of mean_daily_dose to see if it is plausible (no extremely large or negative values) */
-/* Some extreme values (e.g. 5000). Need to correct for this later */
-/* max is 30 */
-title "Max mean_daily_dose";
-proc sql;
-  select max(mean_daily_dose)
-  from bph_tam_dose;
-quit;
-
-
-proc contents data = bph_tam_dose;
-run;
-
-
-/* Check for ties in earliest date */
-title "Number of multi drug initiators";
-proc sql;
-  select count(distinct patid) as n_excluded
-  from ExcludeMulti;
-quit;
-
-/* replaced varaible d2.exposure with dr.prodcodeid, not sure if that is important;
-/* Check how many unique patients remain after exclusion of prevalent. */
-/* 185, 936 patients */
-title "Numbers of unique ids after excluding prevalent users";
-proc sql;
-  select count(distinct patid) as n_patid
-  from output.Rx_PostStart;
-quit;
-
-*checking*;
-
-* though around a third of patients lost, durations look believable with most having 
-* >365 days, and high frequency of first Rx on 0 days and 30 days;
-
-
-PROC SQL;
-create table EarliestRx_washout AS
-select *, earliest_rx_date - regstartdate AS washout
-from EarliestRxBph_Filtered;
-quit;
-
-proc sort data = EarliestRx_washout;
-by duration;
-run;
-
-proc freq data = EarliestRx_washout;
-tables duration;
-run;
-
-proc sort data = output.bph_drugs;
-by duration patid issuedate;
-run;
-
-proc sql;
-select median(duration) into :med_duration
-from output.bph_drugs;
-quit;
 
