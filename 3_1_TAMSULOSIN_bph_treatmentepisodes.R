@@ -110,10 +110,8 @@ bph_pp <- left_join(bph_pp, bph_cohort, by = "patid")
 bph_pp <- bph_pp %>% 
   mutate(end_of_fu = lubridate::ymd(episode.end)) %>% 
   mutate(end_of_fu = end_of_fu %>% replace_when(
-    !is.na(regenddate) & regenddate < end_of_fu & regenddate > lubridate::ymd('2002-10-31') ~ regenddate,
-    !is.na(cprd_ddate) & cprd_ddate < end_of_fu & cprd_ddate > lubridate::ymd('2002-10-31') ~ cprd_ddate,
+    !is.na(censordate) & censordate < end_of_fu & censordate > lubridate::ymd('2002-10-31') ~ censordate,
     !is.na(aSAH_gp_dt) & aSAH_gp_dt < end_of_fu & aSAH_gp_dt > lubridate::ymd('2002-10-31') ~ aSAH_gp_dt,
-    !is.na(lcd) & cprd_ddate < end_of_fu & regenddate > lubridate::ymd('2002-10-31') ~ lcd,
     lubridate::ymd('2025-03-31') < end_of_fu ~ lubridate::ymd('2025-03-31')
   )) %>% 
   mutate(aSAH = if_else(!is.na(aSAH_gp_dt) & aSAH_gp_dt <= end_of_fu, 1, 0)) %>% 

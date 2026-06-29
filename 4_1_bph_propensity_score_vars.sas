@@ -15,11 +15,11 @@ options fullstimer;
 *#####################################;
 
 /* Macro to initialize the main table with the initial data */
-
+/* Creates data subset for faster process
 data output.lil_cohort;
 set output.bph_cohort (obs=100);
 run;
-
+*/
 
  */ Since we made file 3 in R, we'll have to reintroduce the index date here /*;
 
@@ -40,11 +40,12 @@ proc sql;
 	create table output.bph_pp_propscor as
 	select b.*,
 		   i.index_date
-	from output.lil_cohort AS b
+	from output.bph_cohort AS b
 	left outer join indexdate as i 
 	on b.patid = i.patid
 	where index_date is not null;
 quit;
+
 
 %mend initialize_main_table;
 
@@ -112,7 +113,6 @@ data disorders;
 	codelist.copd, output.copd_cohort, copd
 	codelist.stroke, output.stroke_cohort, stroke
 	codelist.rheumatological_disease, output.rheumatological_disease_cohort, rheumatological_disease
-	codelist.copd, output.copd_cohort, copd
 	codelist.diabetes, output.diabetes_cohort, diabetes
 	codelist.heart_failure, output.heart_failure_cohort, heart_failure
 	codelist.hypercholesterolaemia, output.hypercholesterolaemia_cohort, hypercholesterolaemia
@@ -129,14 +129,4 @@ run;
 /* Run the main macro to process all disorders */
 %process_disorders;
 
-proc sql;
-select libname, path
-from dictionary.libnames
-where libname = 'CODELIST';
-quit;
 
-
-
-
-proc contents data = codelist.alzheimers_disease;
-run;

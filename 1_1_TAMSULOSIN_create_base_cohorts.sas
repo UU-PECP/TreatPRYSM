@@ -11,7 +11,7 @@
 
 libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
 libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\Codelists";
+libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes";
 options fullstimer;
 
 
@@ -245,39 +245,13 @@ PROC SQL;
 quit;
 
 
-
-* STEP 6: Extract patids of patients with linked HES data;
-
-* PROC SQL * ;
-
-proc sql;
-	create table output.linked_bph_cohort as
-	select a.* , b.linkyear, b.lsoa_e, b.hes_apc_e
-	from output.BPH_initial as a 
-	left outer join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid;
-quit;
-
-*check*;
-proc freq data = output.linked_bph_cohort;
-	tables hes_apc_e /MISSING;
-	run;
-*******;
-
-proc sql;
-create table output.exclude_bph_unlinked AS
-select *
-from output.linked_bph_cohort
-where lsoa_e = 1 and hes_apc_e = 1;
-quit;
-
-
-* STEP 7: RETRIEVE aSAH CASES *;
+* STEP 6: RETRIEVE aSAH CASES *;
 
 proc SQL;
 	CREATE TABLE output.bph_cohort AS
 	SELECT bc.*, 
 		   aSAH.aSAH_dt as aSAH_gp_dt
-	FROM output.exclude_bph_unlinked AS bc
+	FROM output.BPH_initial AS bc
 	LEFT OUTER JOIN output.aSAH_gp AS aSAH ON bc.patid = aSAH.patid;
 quit;
 
@@ -289,15 +263,41 @@ WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
 
-* STEP 8: Add Baseline date *;
+* STEP 7: Add baseline and end date *;
 
 data output.bph_cohort;
 	set output.bph_cohort;
 
 	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
+	informat baseline_dt DDMMYY10.;
 	baseline_dt = max(of regstartdate bph_dt);
 	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
+	format baseline_dt DDMMYY10.;
 	run;
+
+data output.bph_cohort;
+	set output.bph_cohort;
+	studyend = '31MAR2025'd; 
+	censordate = min(regenddate, cprd_ddate, lcd, studyend);
+	format censordate ddmmyy10.;
+	run;
+
+ * STEP 8: Removing children *;
+
+
+data output.bph_cohort;
+set output.bph_cohort;
+aprox_age = year(baseline_dt) - yob;
+if aprox_age > 17;
+run;
+
+*THE FINISHED PRODUCT*;
+
+	data output.bph_cohort;
+set output.bph_cohort (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
+run;
+
+
 
 *******************************************************************************
 
@@ -345,32 +345,6 @@ PROC SQL;
 quit;
 
 
-* STEP 10: Extract patids of patients with linked HES data;
-
-
-proc sql;
-	create table output.linked_nl_cohort as
-	select bc.* , lc.linkyear, lc.lsoa_e, lc.hes_apc_e
-	from output.nl_initial as bc 
-	left outer join rawdata.aurum_eligibility_jan2026 as lc on bc.patid = lc.patid;
-	
-quit;
-
-*check*;
-proc freq data = output.linked_nl_cohort;
-	tables hes_apc_e /MISSING;
-	run;
-
-*******;
-
-proc sql;
-create table output.exclude_nl_unlinked AS
-select *
-from output.linked_nl_cohort
-where lsoa_e = 1 and hes_apc_e = 1;
-quit;
-
-
 
 * STEP 11: RETRIEVE aSAH CASES *;
 
@@ -378,7 +352,7 @@ proc SQL;
 	CREATE TABLE output.nl_cohort AS
 	SELECT bc.*, 
 		   aSAH.aSAH_dt as aSAH_gp_dt
-	FROM output.exclude_nl_unlinked AS bc
+	FROM NL_initial AS bc
 	LEFT OUTER JOIN output.aSAH_gp AS aSAH ON bc.patid = aSAH.patid;
 quit;
 
@@ -391,36 +365,77 @@ SELECT COUNT(*) FROM output.nl_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
-* STEP 12: Add Baseline date *;
+* STEP 12: Add Baseline and censor date *;
 
-data output.bph_cohort;
-	set output.bph_cohort;
+data output.nl_cohort;
+	set output.nl_cohort;
 
 	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
 	baseline_dt = max(of regstartdate nl_dt);
 	if baseline_dt < '01DEC2007'd then baseline_dt = '01DEC2007'd;
+	format baseline_dt DDMMYY10.;
 	run;
 
-***********************************************;
-************** EXPORTING PATIDS ***************;
-***********************************************;
+data output.nl_cohort;
+	set output.nl_cohort;
+	studyend = '31MAR2025'd; 
+	censordate = min(regenddate, cprd_ddate, lcd, studyend);
+	format censordate ddmmyy10.;
+	run;
 
-* STEP 13: create external files;
 
-* final count: 604422 patients;
-proc export data = output.nl_cohort (keep = patid)
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_NL.csv"
-dbms=csv
-replace;
+
+ * STEP 13: Removing children and rare diseases*;
+
+
+data nokids;
+set output.nl_cohort;
+aprox_age = year(baseline_dt) - yob;
+if aprox_age > 17;
 run;
 
-*final count: 243789 patients;
-proc export data = output.bph_cohort (keep = patid)
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
-dbms=csv
-replace;
+
+
+
+data RareDisease_cod;
+	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
+	length medcodeid 8 ;
+	input medcodeid :19. ;
 run;
 
+proc sql;
+create table RareDisease_char as 
+select put(medcodeid, 19.) as newmedcodeid
+from RareDisease_cod;
+quit;
+
+
+proc sql;
+	CREATE TABLE rarediseasecases AS
+	SELECT r.*
+	FROM output.clinical as r
+inner join RareDisease_char as c on strip(c.newmedcodeid) = strip(r.medcodeid);
+quit;
+
+
+/* Exclude 248 */
+proc sql;
+	create table rarediseaseexc as
+	select *
+	from nokids a
+	where not exists (
+		select 1 
+		from rarediseasecases b
+		where a.patid = b.patid
+		);
+quit;
+
+
+*THE FINISHED PRODUCT*;
+
+data output.nl_cohort;
+set rarediseaseexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
+run;
 
 ***********************************************;
 **************** SANITY CHECKS ****************;
