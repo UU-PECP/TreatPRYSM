@@ -14,7 +14,7 @@ library(janitor)
 
 ### Reading in data
 
-bphdata <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\All_bph_drugissue.sas7bdat")
+bphdata <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\All_bph_drugissue_linked.sas7bdat")
 n_distinct(bphdata$patid)
 
 drugs <- c("Tamsulosin", "Finasteride", "Alfuzosin")

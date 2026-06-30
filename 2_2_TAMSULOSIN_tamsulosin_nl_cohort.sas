@@ -54,7 +54,7 @@ run;
 proc sql;
 	CREATE TABLE codelist.analgesics AS
 	SELECT prodcodeid, "analgesic" as drugsubstancename
-	FROM &in 
+	FROM rawdata.product_aurum_atc 
 	WHERE ATC LIKE 'M01AE%' OR ATC LIKE 'N02%';
 quit;
 
@@ -74,7 +74,7 @@ proc sql;
 		   r.duration,
 		   c.drugsubstancename,
 		   c.ProdCodeId
-	FROM rawdata.drugissue_1 as r
+	FROM &in as r
 inner join nl_char as c on strip(c.prodcodeid) = strip(r.prodcodeid);
 quit;
 
@@ -405,8 +405,9 @@ data bph_patients;
 proc sql;
 	create table output.linked_nl_cohort as
 	select a.* , b.linkyear, b.lsoa_e, b.hes_apc_e
-	from bph_patients as a 
-	left outer join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid;
+	from nl_patients as a 
+	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
+	where b.lsoa_e = 1 and b.hes_apc_e = 1;
 quit;
 
 

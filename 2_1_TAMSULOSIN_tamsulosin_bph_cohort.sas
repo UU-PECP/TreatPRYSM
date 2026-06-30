@@ -9,7 +9,7 @@
 /************************************************/;
 
 /**************************************************************************/
-/* Set up library references and global options                           */
+/* Set up library references and global options                          */
 /**************************************************************************/
 
 libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
@@ -22,11 +22,10 @@ options fullstimer; /* Display detailed resource usage info in log */
 %macro drugdata(in =, out=);
 
 /**************************************************************************/
-*** Step 1: Extract BPH drug records;
+/* STEP 1: Extract BPH drug records for the current drugissue file        */
 /**************************************************************************/
 
-
-%macro product (var=, code=);
+%macro product (var=, code=, drugfile=);
 data &var._cod;
 	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists\&code..txt" dsd dlm='09'x firstobs=2 truncover;
 	length prodcodeid 8 DMDCode 8 TermfromEMIS $36 ProductName $36 drugsubstancename $36.;
@@ -49,13 +48,14 @@ proc sql;
 		   r.duration,
 		   c.drugsubstancename,
 		   c.ProdCodeId
-	FROM rawdata.drugissue_1 as r
+	FROM &drugfile as r  /* FIXED: renamed parameter from "in" to "drugfile" to avoid recursive
+	                         macro reference, since %drugdata's own parameter is also named "in" */
 inner join &var._char as c on strip(c.newprodcodeid) = strip(r.prodcodeid);
 quit;
 
 %mend product;
 
-%product (var=bph, code=bph);
+%product (var=bph, code=bph, drugfile=&in);  /* FIXED: no more naming collision with outer &in */
 
 
 /* HOW MANY PATIENTS */
@@ -93,7 +93,7 @@ run;
 
 * borrowed from ADEPT script with permission from Magda *;
 
-data output.bph_tam_cleaning;
+data bph_tam_cleaning;
 set bph_dosages;
 if daily_dose > 5 or daily_dose = . then daily_dose = 1;
 if daily_dose = 0 then daily_dose = 0.5;
@@ -103,7 +103,7 @@ if assumed_duration = . and duration ne . and duration > 0 and duration < 90 the
 if assumed_duration = . or assumed_duration < 1 then assumed_duration = 30;
 run; 
 
-proc univariate data=output.bph_tam_cleaning;
+proc univariate data=bph_tam_cleaning;
 	var assumed_duration;
 run;
 
@@ -120,14 +120,12 @@ T.issuedate,
 T.drugsubstancename, 
 T.dosageid, 
 T.quantity,
-T.duration,
-T.prodcodeid, 
-T.mg_dose,
-T.mean_daily_dose,
+T.assumed_duration,
+T.prodcodeid,
 BC.regstartdate
 	FROM bph_tam_cleaning AS T
 	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
-ORDER BY T.duration, T.patid, T.issuedate; 
+ORDER BY T.assumed_duration, T.patid, T.issuedate; 
 quit;
 
 
@@ -135,12 +133,12 @@ quit;
 /* HOW MANY PATIENTS */
 /* losing about 30 thousand*/
 proc sql;
-select count(distinct patid) as "Step 2: bphtam join to base"n
+select count(distinct patid) as "Step 3: bphtam join to base"n
 from bph_tam
 quit;
 
 /**************************************************************************/
-/* STEP 3: Exclude 'PrevalentUsers'                               */
+/* STEP 4: Exclude 'PrevalentUsers'                                       */
 /**************************************************************************/
 /* 'Prevalent users' are those who had a drug prescription 1 year before   */
 /* their baseline date. We identify them by comparing issue date with the  */
@@ -154,19 +152,14 @@ proc sql;
 	from output.bph_cohort d1
 		inner join bph_tam d2
 		on d1.patid = d2.patid
-	where d2.issuedate between intnx('year', d1.baseline_dt, -1) and d1.baseline_dt - 1;
+	where d2.issuedate between intnx('year', d1.baseline_dt, -1, 'same') and d1.baseline_dt - 1;
+	/* FIXED: added 'same' alignment so the lookback is a true 365-day window, consistent with the NL file,
+	   rather than snapping to January 1st of the prior year */
 quit;
-
-data test;
-set output.Rx_PostStart;
-usedate = intnx('year', baseline_dt, -1, 'same');
-format usedate ddmmyy10.;
-format baseline_dt ddmmyy10.;
-run;
 
 /* HOW MANY PATIENTS */
 proc sql;
-select count(distinct patid) as "Step 3: prevalent user #"n
+select count(distinct patid) as "Step 4: prevalent user #"n
 from PrevalentUsers
 quit;
 
@@ -174,14 +167,13 @@ quit;
 /* We remove those in PrevalentUsers.                                 */
 /* We only keep prescriptions dated on or after baseline.             */
 
-** lose 30 thousand patients here per file, but seems realistic;
+** lose 40 thousand patients here per file, but seems realistic;
 ** NOTE: this is running really slowly **;
 proc sql;
 	create table output.Rx_PostStart as
 	select d1.*,
 		   d2.issuedate,
-		   d2.duration,
-		   d2.mean_daily_dose,
+		   d2.assumed_duration,
 		   d2.prodcodeid,
 		   d2.quantity,
 		   d2.drugsubstancename
@@ -199,12 +191,12 @@ quit;
 
 /* HOW MANY PATIENTS */
 proc sql;
-select count(distinct patid) as "Step 3: removing prevalent users"n
+select count(distinct patid) as "Step 4: removing prevalent users"n
 from output.Rx_PostStart
 quit;
 
 /**************************************************************************/
-/* STEP 4: Identify earliest prescription date for each patient           */
+/* STEP 5: Identify earliest prescription date for each patient           */
 /**************************************************************************/
 /* Finds the minimum (earliest) eventdate among the valid prescriptions.  */
 
@@ -225,9 +217,8 @@ proc sql;
 	create table output.EarliestRxBphAll as
 	select p.patid,
 		   p.issuedate,
-		   p.duration,
+		   p.assumed_duration,
 		   p.prodcodeid,
-		   p.bph_dt,
 		   p.baseline_dt,
 		   e.earliest_rx_date,
 		   p.regstartdate,
@@ -241,12 +232,12 @@ quit;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as "Step 4: First issue date"n
+select count(distinct patid) as "Step 5: First issue date"n
 from output.EarliestRxBphAll
 quit;
 
 /**************************************************************************/
-/* STEP 5: Exclude patients who have more than one record on earliest Rx  */
+/* STEP 6: Exclude patients who have more than one record on earliest Rx  */
 /**************************************************************************/
 /* If a patient has > 1 row on the earliest date (possibly multiple drugs),*/
 /* we remove them so each patient has exactly one earliest Rx.            */
@@ -269,7 +260,7 @@ quit;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as "Step 5: multi-drug"n
+select count(distinct patid) as "Step 6: multi-drug"n
 from EarliestRxBph_Filtered
 quit;
 
@@ -279,20 +270,19 @@ proc sql;
 	       patid, 
 		   earliest_rx_date,
 		   prodcodeid, 
-		   duration,
-		   bph_dt,
+		   assumed_duration,
 		   baseline_dt,
 		   drugsubstancename,
 		   regstartdate
 	from EarliestRxBph_Filtered
 	group by patid, drugsubstancename
-	having duration = max(duration)  /* Prefer longest treatment if two prescriptions on same date */
+	having assumed_duration = max(assumed_duration)  /* Prefer longest treatment if two prescriptions on same date */
 	;
 quit;
 
 
 /**************************************************************************/
-/* STEP 6: Exclude if Follow-up period is less than 365 days  */
+/* STEP 7: Exclude if follow-up period is less than 365 days              */
 /**************************************************************************/
 
 PROC SQL;
@@ -311,10 +301,11 @@ quit;
 **********;
 /*
 /**************************************************************************/
-/* STEP 7: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx  */
+/* STEP 8: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx   */
+/* (COMMENTED OUT until HES APC linkage is incorporated - also exclude    */
+/*  for Marfan/Loeys-Dietz syndrome when re-enabled)                      */
 /**************************************************************************/
-/* ALSO EXCLUDE FOR MARFAN SYNDROME etc */
-/* If a patient s first aSAH date (HOSP ONLY) is before earliest Rx, we drop them.    */
+/* If a patient's first aSAH date (HOSP ONLY) is before earliest Rx, we drop them.    */
 /* NOTE: DO NOT RUN UNTIL HES APC LINKAGE */
 /* NOTE: Jos's version requires both hospital and gp data so I have written new script myself for the timebeing*/
 
@@ -335,26 +326,29 @@ quit;
 
 
 /**************************************************************************/
-/* STEP 8: Link to ATC codes  */
+/* STEP 9: Link to ATC codes                                              */
 /**************************************************************************/
+/* NOTE: source table is EarliestRx_washout, not output.BphIndexDrug,     */
+/* since Step 8 (which would have created BphIndexDrug) is commented out  */
+/* pending HES APC linkage. Will need to repoint this to BphIndexDrug     */
+/* once Step 8 is reinstated.                                             */
 
 proc sql;
-	create table &out as /* change to _2, _3, and _4 per file */
+	create table &out as /* resolves to output.bphdrugatc_1, _2, _3, or _4 depending on which file is running */
 	select b.*, a.ATC
-	from output.BphIndexDrug b
+	from EarliestRx_washout b
 		left  outer join rawdata.product_aurum_atc as a
 		on b.prodcodeid = a.prodcodeid;
 quit;
 
-proc sort data = output.BphDrugAtc_4;
-by duration;
+proc sort data = &out; /* FIXED: was hardcoded to output.BphDrugAtc_4, now correctly sorts whichever file is current */
+by assumed_duration;
 run;
 
 %mend;
 
-
 /**************************************************************************/
-/* STEP 9: COMBINE FILES */
+/* STEP 10: Combine all four drugissue files                              */
 /**************************************************************************/
 
 %drugdata(in=rawdata.drugissue_1, out= output.bphdrugatc_1)
@@ -389,10 +383,19 @@ output.bphdrugatc_3
 output.bphdrugatc_4;
 run;
 
+proc sql;
+	create table output.all_bph_drugissue_linked as
+	select a.* 
+	from output.all_bph_drugissue as a 
+	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
+	where b.lsoa_e = 1 and b.hes_apc_e = 1;
+quit;
 
 /**************************************************************************/
-/* STEP 10: Extract patids of patients with linked HES data 				  */
+/* STEP 11: Extract patids of patients with linked HES data               */
 /**************************************************************************/
+/* NOTE: currently collapses to first row per patient before linkage -    */
+/* revisit whether this should retain full prescription history instead   */
 
 proc sort data = output.all_bph_drugissue;
 by patid issuedate;
@@ -408,25 +411,8 @@ proc sql;
 	create table output.linked_bph_cohort as
 	select a.* , b.linkyear, b.lsoa_e, b.hes_apc_e
 	from bph_patients as a 
-	left outer join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid;
-quit;
-
-*check*;
-proc freq data = output.linked_bph_cohort;
-	tables hes_apc_e /MISSING;
-	run;
-
-proc sql;
-create table output.linked_bph_cohort AS
-select *
-from output.linked_bph_cohort
-where lsoa_e = 1 and hes_apc_e = 1;
-quit;
-
-/*HOW MANY PATIENTS*/
-proc sql;
-select count(distinct patid) as n
-from output.all_bph_drugissue
+	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
+	where b.lsoa_e = 1 and b.hes_apc_e = 1;
 quit;
 
 ***********************************************;
@@ -444,21 +430,19 @@ run;
 
 
 /**************************************************************************/
-/* STEP 11: SANITY TESTING */
+/* STEP 12: Sanity testing - checks steps throughout BPH document         */
 /**************************************************************************/
-/* Checks steps throughout BPH document      */
-
 
 proc sort data = output.all_bph_drugissue;
-by duration patid issuedate;
+by assumed_duration patid issuedate;
 run;
 
 *** how many records still have an odd duration?***;
 
 data test;
 set output.all_bph_drugissue;
-if duration < 7 then oddvalues = "TRUE";
-else if duration >= 7 then oddvalues = "FALSE";
+if assumed_duration < 7 then oddvalues = "TRUE";
+else if assumed_duration >= 7 then oddvalues = "FALSE";
 run;
 
 proc freq data = output.all_bph_drugissue;
@@ -468,5 +452,5 @@ run; */ only 0.07*/;
 
 data test;
 set output.all_bph_drugissue;
-if duration < 7 then duration = 30;
+if assumed_duration < 7 then assumed_duration = 30;
 run;

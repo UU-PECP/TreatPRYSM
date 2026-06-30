@@ -81,9 +81,7 @@ set base_cohort_1
 	base_cohort_4;
 run;
 
-*Step 2; 
-/* Exclude patients from wales*/
-/* extract lcd */
+*STEP 2: Exclude patients from Wales and extract lcd; 
 /*Import practice records */
 
 proc sql;
@@ -147,7 +145,7 @@ FROM output.initial_cohort AS coh
 LEFT OUTER JOIN
 		output.practice AS pra
 		ON coh.pracid = pra.pracid
-        WHERE region ne 10;
+        WHERE pra.region ne 10; /* FIXED: was unqualified "region", now correctly references pra.region */
 quit;
 
 
@@ -197,6 +195,26 @@ proc sql;
 quit;
 
 
+*Build rare disease codelist once, used by both BPH and NL cohorts below;
+
+data RareDisease_cod;
+	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
+	length medcodeid 8 ;
+	input medcodeid :19. ;
+run;
+
+proc sql;
+create table RareDisease_char as 
+select put(medcodeid, 19.) as newmedcodeid
+from RareDisease_cod;
+quit;
+
+proc sql;
+	CREATE TABLE rarediseasecases AS
+	SELECT r.*
+	FROM output.clinical as r
+	inner join RareDisease_char as c on strip(c.newmedcodeid) = strip(r.medcodeid);
+quit;
 
 
 *******************************************************************************
@@ -205,9 +223,8 @@ quit;
 
 *******************************************************************************;
 
-* STEP 5: Add information on bph and baseline date;
+* STEP 5: Identify first BPH diagnosis date for each patient before end of study period;
 
-	*Get first bph date for each patient before end of study period;
 	*NOTE: generates 54 patients with missing bph dates not in initial cohort file;
 
 proc sql;
@@ -225,6 +242,8 @@ quit;
 
 
 
+* STEP 6: Restrict initial cohort to patients with a BPH diagnosis;
+
 PROC SQL;
 	CREATE TABLE output.BPH_initial AS
 	SELECT
@@ -238,14 +257,13 @@ PROC SQL;
 		bph_coh.bph_dt
 	FROM
 		output.initial_cohort AS bc
-	LEFT OUTER JOIN
+	INNER JOIN
 		output.bph_cases AS bph_coh
-		ON bc.patid = bph_coh.patid
-	WHERE bph_coh.bph_dt IS NOT NULL;
+		ON bc.patid = bph_coh.patid;
 quit;
 
 
-* STEP 6: RETRIEVE aSAH CASES *;
+* STEP 7: Retrieve aSAH cases (GP-recorded, temporary until HES APC incorporated) *;
 
 proc SQL;
 	CREATE TABLE output.bph_cohort AS
@@ -263,12 +281,12 @@ WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
 
-* STEP 7: Add baseline and end date *;
+* STEP 8: Define baseline date and censor date *;
 
 data output.bph_cohort;
 	set output.bph_cohort;
 
-	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
+	*Define baseline dt as the later of registration start date or bph_dt, floored at study start (31OCT2002);
 	informat baseline_dt DDMMYY10.;
 	baseline_dt = max(of regstartdate bph_dt);
 	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
@@ -282,8 +300,7 @@ data output.bph_cohort;
 	format censordate ddmmyy10.;
 	run;
 
- * STEP 8: Removing children *;
-
+* STEP 9: Exclude patients under 18 years old at baseline (aprox_age > 17 retains adults) *;
 
 data output.bph_cohort;
 set output.bph_cohort;
@@ -291,10 +308,23 @@ aprox_age = year(baseline_dt) - yob;
 if aprox_age > 17;
 run;
 
+* STEP 10: Exclude rare disease cases (e.g. Loeys-Dietz, Marfan syndrome) *;
+
+proc sql;
+	create table bph_rarediseaseexc as
+	select *
+	from output.bph_cohort a
+	where not exists (
+		select 1 
+		from rarediseasecases b
+		where a.patid = b.patid
+		);
+quit;
+
 *THE FINISHED PRODUCT*;
 
-	data output.bph_cohort;
-set output.bph_cohort (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
+data output.bph_cohort;
+set bph_rarediseaseexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
 run;
 
 
@@ -306,9 +336,7 @@ run;
 *******************************************************************************;
 
 *NOTE: contains several intermediate files in work library that will be overwritten later in nephrolithiasis cohort generation;
-* STEP 9: Add information on bph and baseline date;
-
-	*Get first nl date for each patient before end of study period;
+* STEP 11: Identify first nephrolithiasis diagnosis date for each patient before end of study period;
 
 proc sql;
       CREATE TABLE output.nl_cases AS
@@ -324,6 +352,8 @@ proc sql;
 quit;
 
 
+* STEP 12: Restrict initial cohort to patients with a nephrolithiasis diagnosis;
+	*Simplified from a LEFT OUTER JOIN + WHERE nl_dt IS NOT NULL to a plain INNER JOIN (equivalent result, clearer intent);
 
 PROC SQL;
 	CREATE TABLE NL_initial AS
@@ -337,16 +367,14 @@ PROC SQL;
 		nl_coh.nl_dt
 	FROM
 		output.initial_cohort AS bc
-	LEFT OUTER JOIN
+	INNER JOIN
 		output.nl_cases AS nl_coh
-		ON bc.patid = nl_coh.patid
-	WHERE nl_coh.nl_dt IS NOT NULL;
-	*without the above line, could this step be replaced by an inner join? ;
+		ON bc.patid = nl_coh.patid;
 quit;
 
 
 
-* STEP 11: RETRIEVE aSAH CASES *;
+* STEP 13: Retrieve aSAH cases (GP-recorded, temporary until HES APC incorporated) *;
 
 proc SQL;
 	CREATE TABLE output.nl_cohort AS
@@ -365,12 +393,12 @@ SELECT COUNT(*) FROM output.nl_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
 quit;
 
-* STEP 12: Add Baseline and censor date *;
+* STEP 14: Define baseline date and censor date *;
 
 data output.nl_cohort;
 	set output.nl_cohort;
 
-	*Define baseline dt as first date of 01-08-2004, uts, hypertension_dt, or crd;
+	*Define baseline dt as the later of registration start date or nl_dt, floored at study start (01DEC2007);
 	baseline_dt = max(of regstartdate nl_dt);
 	if baseline_dt < '01DEC2007'd then baseline_dt = '01DEC2007'd;
 	format baseline_dt DDMMYY10.;
@@ -384,9 +412,7 @@ data output.nl_cohort;
 	run;
 
 
-
- * STEP 13: Removing children and rare diseases*;
-
+* STEP 15: Exclude patients under 18 years old at baseline (aprox_age > 17 retains adults) *;
 
 data nokids;
 set output.nl_cohort;
@@ -395,32 +421,11 @@ if aprox_age > 17;
 run;
 
 
-
-
-data RareDisease_cod;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
-	length medcodeid 8 ;
-	input medcodeid :19. ;
-run;
-
-proc sql;
-create table RareDisease_char as 
-select put(medcodeid, 19.) as newmedcodeid
-from RareDisease_cod;
-quit;
-
-
-proc sql;
-	CREATE TABLE rarediseasecases AS
-	SELECT r.*
-	FROM output.clinical as r
-inner join RareDisease_char as c on strip(c.newmedcodeid) = strip(r.medcodeid);
-quit;
-
+* STEP 16: Exclude rare disease cases (e.g. Loeys-Dietz, Marfan syndrome) *;
 
 /* Exclude 248 */
 proc sql;
-	create table rarediseaseexc as
+	create table nl_rarediseaseexc as
 	select *
 	from nokids a
 	where not exists (
@@ -434,7 +439,7 @@ quit;
 *THE FINISHED PRODUCT*;
 
 data output.nl_cohort;
-set rarediseaseexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
+set nl_rarediseaseexc (keep = patid yob regstartdate nl_dt aSAH_gp_dt baseline_dt censordate);
 run;
 
 ***********************************************;
@@ -460,10 +465,8 @@ run;
 proc sql;
 	create table test as
 	select distinct patid
-	from linked_bph_cohort;
+	from output.bph_cohort;
 run;
 
 proc contents data = test;
 run;
-
-
