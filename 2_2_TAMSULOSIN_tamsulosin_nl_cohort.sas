@@ -30,54 +30,35 @@ options fullstimer; /* Display detailed resource usage info in log */
 /**************************************************************************/
 
 *Improting analgesics codelist from ATC codes in ;
-
-
-data tamsulosin_only_cod;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists\tamsulosin_only.txt" dsd dlm='09'x firstobs=2 truncover;
-	length prodcodeid 8 DMDCode 8 TermfromEMIS $36 ProductName $36 drugsubstancename $36;
-	input prodcodeid :19. DMDCode :19. TermfromEMIS :$36. ProductName :$36. drugsubstancename :$36.;
-run;
-
+%macro product (var=, atccode =,drugfile=);
 proc sql;
-create table tamsulosin_only_char as 
-select "tamsulosin" as drugsubstancename, put(prodcodeid, 19.) as newprodcodeid
-from tamsulosin_only_cod;
-quit;
-
-data tamsulosin_only_char;
-retain newprodcodeid drugsubstancename;
-set tamsulosin_only_char;
-rename newprodcodeid = prodcodeid;
-run;
-
-
-proc sql;
-	CREATE TABLE codelist.analgesics AS
-	SELECT prodcodeid, "analgesic" as drugsubstancename
+	CREATE TABLE codelist.&var._codes AS
+	SELECT *
 	FROM rawdata.product_aurum_atc 
-	WHERE ATC LIKE 'M01AE%' OR ATC LIKE 'N02%';
+	WHERE ATC LIKE &atccode;
 quit;
 
-proc sql;
-	create table nl_char AS
-	select * from codelist.analgesics
-	union all
-	select * from tamsulosin_only_char;
-quit;
 
 proc sql;
-	CREATE TABLE output.nl_drugs AS
+	CREATE TABLE output.&var._drugs AS
 	SELECT r.patid, 
 		   r.issuedate, 
 		   r.dosageid, 
 		   r.quantity,
 		   r.duration,
-		   c.drugsubstancename,
-		   c.ProdCodeId
-	FROM &in as r
-inner join nl_char as c on strip(c.prodcodeid) = strip(r.prodcodeid);
+		   r.prodcodeid
+	FROM &drugfile as r  
+inner join codelist.&var._codes as c on strip(c.prodcodeid) = strip(r.prodcodeid);
 quit;
+%mend product;
 
+%product (var=tamsulosin, atccode = 'G04CA%', drugfile = &in);
+
+data output.nl_drugs;
+set output.tamsulosin_drugs (in = a) output.analgesics_drugs (in = b);
+if a then exposure = 1;
+else if in b then exposure = 0;
+run;
 
 
 /* HOW MANY PATIENTS */
@@ -253,6 +234,7 @@ proc sql;
 quit;
 
 /*HOW MANY PATIENTS*/
+* there are fewer observations here because it is grouped by patid rather than drugissue ;
 proc sql;
 select count(distinct patid) as "Step 4: First issue date"n
 from EarliestRxNlAll
@@ -263,15 +245,21 @@ tables drugsubstancename /MISSING;
 run;
 
 /* excluding prescriptions not relevant to nl diagnosis, before or > 1 month later */
-*** Lost 20 thousand patients, significant but reasonable ***;
+
 
 proc sql;
 	create table EarliestRxNl_Filtered as
 	select *
 	from EarliestRxNlAll
-	where earliest_rx_date - nl_dt <= 30
-	and earliest_rx_date >= nl_dt;
+	where earliest_rx_date - baseline_dt <= 30
+	and earliest_rx_date >= baseline_dt;
 quit;
+
+/* TROUBLESHOOTING */
+data test;
+set EarliestRxNlAll;
+daysdiff = earliest_rx_date - baseline_dt;
+run;
 
 proc sql;
 select count(distinct patid) as "Step 4: drug for nl"n
@@ -388,8 +376,14 @@ output.nldrugatc_3
 output.nldrugatc_4;
 run;
 
+/* HOW MANY PATIENTS */
+proc sql;
+select count(distinct patid) as "final product"n
+from output.all_nl_drugissue
+quit;
+
 /**************************************************************************/
-/* STEP 10: Extract patids of patients with linked HES data 				  */
+/* STEP 10: Extract patids of patients with linked HES data 			  */
 /**************************************************************************/
 
 proc sort data = output.all_nl_drugissue;
@@ -413,8 +407,14 @@ quit;
 
 */ Is this analysis going to be possible ?/*;
 
+data nl_patients;
+	set output.all_nl_drugissue;
+	by patid issuedate;
+	if first.patid then output;
+	run;
+
 data test;
-set output.all_nl_drugissue;
+set nl_patients;
 if aSAH_gp_dt = . then aSAH = 0;
 if aSAH_gp_dt ne . then aSAH = 1;
 if drugsubstancename ne "Tamsulosin" and drugsubstancename ne "Analgesic" then drugsubstancename = "None";
@@ -424,5 +424,9 @@ proc freq data = test;
 tables drugsubstancename * aSAH;
 run;
 
+*** ANOTHER WAY ***;
 
-
+proc sql;
+select count(distinct patid) as "nl_cohort"n
+from output.nl_cohort;
+quit;

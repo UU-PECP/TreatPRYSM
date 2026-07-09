@@ -301,7 +301,7 @@ data output.bph_cohort;
 	run;
 
 * STEP 9: Exclude patients under 18 years old at baseline (aprox_age > 17 retains adults) *;
-
+*NOTE HOW MANY *;
 data output.bph_cohort;
 set output.bph_cohort;
 aprox_age = year(baseline_dt) - yob;
@@ -309,7 +309,7 @@ if aprox_age > 17;
 run;
 
 * STEP 10: Exclude rare disease cases (e.g. Loeys-Dietz, Marfan syndrome) *;
-
+* NOTE HOW MANY *;
 proc sql;
 	create table bph_rarediseaseexc as
 	select *

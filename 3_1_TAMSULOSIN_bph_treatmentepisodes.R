@@ -11,21 +11,21 @@ library(AdhereR)
 
 library(janitor)
 
-
 ### Reading in data
 
-bphdata <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\All_bph_drugissue_linked.sas7bdat")
+bphdata <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\all_bph_episodes.sas7bdat")
 n_distinct(bphdata$patid)
 
-drugs <- c("Tamsulosin", "Finasteride", "Alfuzosin")
 
-### Generating treatment episodes for each drug seperately
+drugs <- c(1, 2, 3)
+
+### Generating treatment episodes for each drug separately
 
 treat_episode <- list()
 
 for (drug in drugs) {
   
-  df_drug <- bphdata %>% filter(drugsubstancename == drug)
+  df_drug <- bphdata %>% filter(exposure == drug)
   
   treat_episode[[drug]] <- compute.treatment.episodes(
     
@@ -35,7 +35,7 @@ for (drug in drugs) {
     
     event.date.colname = "issuedate",
     
-    event.duration.colname = "duration",
+    event.duration.colname = "assumed_duration",
     
     medication.class.colname = "ATC",
     
@@ -84,25 +84,36 @@ for (drug in drugs) {
 
 ### Bind together the three drugs with labelled substance name per episode.
 
-treat_epi_all <- bind_rows(treat_episode, .id = "drugsubstancename")
+treat_epi_all <- bind_rows(treat_episode, .id = "exposure")
 
 write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_treatmentepisodes.csv")
 treat_epi_all <- read.csv("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_treatmentepisodes.csv")
 ### Per protocol: keep only first coverage blocks (prioritizes first record in the case of multi-drug)
 
-bph_pp <- treat_epi_all %>% filter(episode.ID == 1) %>% mutate(patid = as.character(patid))
-n_distinct(bph_pp$patid)
+pp_epi <- treat_epi_all %>% group_by(patid) %>% 
+                             slice_min(episode.start, n = 1, with_ties = FALSE) %>% 
+                             ungroup() 
 
-bph_pp <- bph_pp %>% 
-  group_by(patid) %>% 
-  slice_min(episode.start, n=1, with_ties = FALSE) %>% 
-  ungroup()
+## Sanity tests
+n_distinct(pp_epi$patid) # exactly the same number of unique patids identified in file 2_1
+pp_epi %>% mutate(futuredates = if_else(episode.end > ymd("2025-03-31"), "yes", "no")) %>% tabyl(futuredates)
+
+future <- pp_epi %>% mutate(futuredates = if_else(episode.end > ymd("2025-03-31"), "yes", "no")) %>% filter(futuredates == "yes")
+
+sub1 <- bphdata %>% filter(patid == 822820018)
+sub2 <- bphdata %>% filter(patid == 2046120545)
+sub3 <- bphdata %>% filter(patid == 160390220164)
+
+
 
 ### Combine treatment episode info with base cohort
+linkedids <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\linked_bph_cohort.sas7bdat")
+pp_epi <- semi_join(pp_epi, linkedids, by = "patid")
 
-bph_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_cohort.sas7bdat")
+bph_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_pp_propscore.sas7bdat")
+## ^ This is old, need to re-run with alcohol
 
-bph_pp <- left_join(bph_pp, bph_cohort, by = "patid")
+bph_pp <- inner_join(bph_pp, bph_cohort, by = "patid")
 
 ### Apply end of follow-up rules
 

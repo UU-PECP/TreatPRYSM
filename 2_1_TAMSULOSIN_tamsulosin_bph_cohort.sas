@@ -18,6 +18,7 @@ libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists";
 
 options fullstimer; /* Display detailed resource usage info in log */
 
+
 ************************************** BPH COHORT ****************************************;
 %macro drugdata(in =, out=);
 
@@ -25,17 +26,12 @@ options fullstimer; /* Display detailed resource usage info in log */
 /* STEP 1: Extract BPH drug records for the current drugissue file        */
 /**************************************************************************/
 
-%macro product (var=, code=, drugfile=);
-data &var._cod;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists\&code..txt" dsd dlm='09'x firstobs=2 truncover;
-	length prodcodeid 8 DMDCode 8 TermfromEMIS $36 ProductName $36 drugsubstancename $36.;
-	input prodcodeid :19. DMDCode :19. TermfromEMIS :$36. ProductName :$36. drugsubstancename :$36.;
-run;
-
+%macro product (var=, atccode =, drugfile =); 
 proc sql;
-create table &var._char as 
-select prodcodeid, drugsubstancename, put(prodcodeid, 19.) as newprodcodeid
-from &var._cod;
+	CREATE TABLE codelist.&var._codes AS
+	SELECT *
+	FROM rawdata.product_aurum_atc 
+	WHERE ATC LIKE &atccode;
 quit;
 
 
@@ -46,16 +42,24 @@ proc sql;
 		   r.dosageid, 
 		   r.quantity,
 		   r.duration,
-		   c.drugsubstancename,
-		   c.ProdCodeId
-	FROM &drugfile as r  /* FIXED: renamed parameter from "in" to "drugfile" to avoid recursive
-	                         macro reference, since %drugdata's own parameter is also named "in" */
-inner join &var._char as c on strip(c.newprodcodeid) = strip(r.prodcodeid);
+		   r.prodcodeid,
+		   c.atc
+	FROM &drugfile as r  
+inner join codelist.&var._codes as c on strip(c.prodcodeid) = strip(r.prodcodeid);
 quit;
-
 %mend product;
 
-%product (var=bph, code=bph, drugfile=&in);  /* FIXED: no more naming collision with outer &in */
+%product (var=tamsulosin, atccode = 'G04CA%', drugfile = &in); 
+%product (var=finisteride, atccode = 'G04CB%', drugfile = &in); 
+%product (var=alfuzosin, atccode = 'G04CA01', drugfile = &in);
+
+
+data output.bph_drugs;
+set output.tamsulosin_drugs (in = a) output.finisteride_drugs (in = b) output.alfuzosin_drugs (in=c);
+if a then exposure = 1;
+else if b then exposure = 2;
+else if c then exposure = 3;
+run;
 
 
 /* HOW MANY PATIENTS */
@@ -117,7 +121,8 @@ PROC SQL;
 CREATE TABLE bph_tam AS
 	SELECT T.patid, 
 T.issuedate,  
-T.drugsubstancename, 
+T.exposure,
+T.atc, 
 T.dosageid, 
 T.quantity,
 T.assumed_duration,
@@ -170,13 +175,14 @@ quit;
 ** lose 40 thousand patients here per file, but seems realistic;
 ** NOTE: this is running really slowly **;
 proc sql;
-	create table output.Rx_PostStart as
+	create table output.Rx_bph_PostStart as
 	select d1.*,
 		   d2.issuedate,
 		   d2.assumed_duration,
 		   d2.prodcodeid,
 		   d2.quantity,
-		   d2.drugsubstancename
+		   d2.exposure,
+		   d2.atc
 	from output.bph_cohort d1
 		inner join bph_tam d2
 		on d1.patid = d2.patid
@@ -192,11 +198,15 @@ quit;
 /* HOW MANY PATIENTS */
 proc sql;
 select count(distinct patid) as "Step 4: removing prevalent users"n
-from output.Rx_PostStart
+from output.Rx_bph_PostStart
 quit;
 
+proc univariate data = output.Rx_bph_PostStart;
+var assumed_duration;
+run;
+
 /**************************************************************************/
-/* STEP 5: Identify earliest prescription date for each patient           */
+/* STEP 5: Identify earliest prescription date for each patient and exclude multi-drug initiators         */
 /**************************************************************************/
 /* Finds the minimum (earliest) eventdate among the valid prescriptions.  */
 
@@ -204,7 +214,7 @@ proc sql;
 	create table output.BphEarliestDate as
 	select patid,
 		   min(issuedate) as earliest_rx_date format = ddmmyy10.
-	from output.Rx_PostStart
+	from output.Rx_bph_PostStart
 	group by patid;
 quit;
 
@@ -213,6 +223,7 @@ quit;
 /* 2) We call this 'EarliestRxAll'.                                       */
 /* 3) If multiple rows share the same earliest date for a patient, we     */
 /*    handle that in the subsequent step.                                 */
+/* why would we want to do this??? */
 proc sql;
 	create table output.EarliestRxBphAll as
 	select p.patid,
@@ -222,11 +233,12 @@ proc sql;
 		   p.baseline_dt,
 		   e.earliest_rx_date,
 		   p.regstartdate,
-		   p.drugsubstancename
-	from output.Rx_PostStart as p
-		inner join output.BphEarliestDate as e
+		   p.exposure,
+		   p.atc
+	from output.Rx_bph_PostStart as p
+		left join output.BphEarliestDate as e
 		on p.patid = e.patid
-	where p.issuedate = e.earliest_rx_date;
+where p.issuedate = e.earliest_rx_date;
 quit;
 
 
@@ -235,18 +247,14 @@ proc sql;
 select count(distinct patid) as "Step 5: First issue date"n
 from output.EarliestRxBphAll
 quit;
+*** excluding multi-drug initiators;
 
-/**************************************************************************/
-/* STEP 6: Exclude patients who have more than one record on earliest Rx  */
-/**************************************************************************/
-/* If a patient has > 1 row on the earliest date (possibly multiple drugs),*/
-/* we remove them so each patient has exactly one earliest Rx.            */
 proc sql;
 	create table ExcludeMulti as
 	select patid
 	from output.EarliestRxBphAll
 	group by patid
-	having count(distinct drugsubstancename) > 1  /* More than 1 unique exposure => Exclude */
+	having count(distinct exposure) > 1  /* More than 1 unique exposure => Exclude */
 	;
 quit;
 
@@ -268,25 +276,27 @@ proc sql;
 	create table EarliestRxBph_Filtered as
 	select distinct
 	       patid, 
+		   issuedate,
 		   earliest_rx_date,
 		   prodcodeid, 
 		   assumed_duration,
 		   baseline_dt,
-		   drugsubstancename,
+		   exposure,
+		   atc,
 		   regstartdate
 	from EarliestRxBph_Filtered
-	group by patid, drugsubstancename
+	group by patid, exposure
 	having assumed_duration = max(assumed_duration)  /* Prefer longest treatment if two prescriptions on same date */
 	;
 quit;
 
 
 /**************************************************************************/
-/* STEP 7: Exclude if follow-up period is less than 365 days              */
+/* STEP 6: Exclude if follow-up period is less than 365 days              */
 /**************************************************************************/
 
 PROC SQL;
-create table EarliestRx_washout AS
+create table EarliestRxBph_Filtered AS
 select * 
 from EarliestRxBph_Filtered
 having earliest_rx_date - regstartdate > 365;
@@ -295,15 +305,14 @@ quit;
 /*HOW MANY PATIENTS*/
 proc sql;
 select count(distinct patid) as "Step 7: Washout exclusions"n
-from EarliestRx_washout
+from EarliestRxBph_Filtered
 quit;
 
 **********;
 /*
 /**************************************************************************/
-/* STEP 8: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx   */
-/* (COMMENTED OUT until HES APC linkage is incorporated - also exclude    */
-/*  for Marfan/Loeys-Dietz syndrome when re-enabled)                      */
+/* STEP 7: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx   */
+/* (COMMENTED OUT until HES APC linkage is incorporated )                      */
 /**************************************************************************/
 /* If a patient's first aSAH date (HOSP ONLY) is before earliest Rx, we drop them.    */
 /* NOTE: DO NOT RUN UNTIL HES APC LINKAGE */
@@ -326,32 +335,42 @@ quit;
 
 
 /**************************************************************************/
-/* STEP 9: Link to ATC codes                                              */
+/* STEP 8: Retrieiving all treatment episodes from patients with exclusion criteria specified in steps 5 & 6   */
 /**************************************************************************/
-/* NOTE: source table is EarliestRx_washout, not output.BphIndexDrug,     */
-/* since Step 8 (which would have created BphIndexDrug) is commented out  */
-/* pending HES APC linkage. Will need to repoint this to BphIndexDrug     */
-/* once Step 8 is reinstated.                                             */
+
+/* FINAL PRODUCT */
 
 proc sql;
-	create table &out as /* resolves to output.bphdrugatc_1, _2, _3, or _4 depending on which file is running */
-	select b.*, a.ATC
-	from EarliestRx_washout b
-		left  outer join rawdata.product_aurum_atc as a
-		on b.prodcodeid = a.prodcodeid;
+create table &out as
+select r.*
+from EarliestRxBph_Filtered as f
+left outer join output.Rx_bph_PostStart as r
+on f.patid = r.patid;
 quit;
-
-proc sort data = &out; /* FIXED: was hardcoded to output.BphDrugAtc_4, now correctly sorts whichever file is current */
-by assumed_duration;
-run;
 
 %mend;
 
 /**************************************************************************/
-/* STEP 10: Combine all four drugissue files                              */
+/* STEP 9: Combine all four drugissue files                              */
 /**************************************************************************/
 
-%drugdata(in=rawdata.drugissue_1, out= output.bphdrugatc_1)
+* data subset test for shorter runtime;
+
+data lildrugissue;
+set rawdata.drugissue_1;
+where input(patid, 19.) > 1000000000000 and input(patid, 19.) < 1050000000000;
+run;
+
+data lilpatient;
+set rawdata.patient_1;
+where input(patid, 19.) > 1000000000000 and input(patid, 19.) < 1050000000000;
+run;
+
+%drugdata(in=lildrugissue, out=output.bphdrugatc_test)
+
+* real data input;
+
+%drugdata(in=rawdata.drugissue_1, out=output.bphdrugatc_1)
 
 proc datasets library = work kill nolist;
 run;
@@ -376,43 +395,56 @@ run;
 quit;
 
 
-data output.all_bph_drugissue;
+data output.all_bph_episodes;
 set output.bphdrugatc_1
 output.bphdrugatc_2
 output.bphdrugatc_3
 output.bphdrugatc_4;
 run;
 
+**************************
+LC.mg_value * CASE 
+							WHEN CD.daily_dose IS NULL THEN 1 
+							WHEN CD.daily_dose = 0 THEN 0.5 
+							ELSE CD.daily_dose 
+						END AS mean_daily_dose
+**************************;
+
+/*HOW MANY PATIENTS? 264,340*/
 proc sql;
-	create table output.all_bph_drugissue_linked as
-	select a.* 
-	from output.all_bph_drugissue as a 
-	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
-	where b.lsoa_e = 1 and b.hes_apc_e = 1;
+select count(distinct patid) as "Final Product"n
+from output.all_bph_episodes
 quit;
 
 /**************************************************************************/
-/* STEP 11: Extract patids of patients with linked HES data               */
+/* STEP 10: Extract patids of patients with linked HES data               */
 /**************************************************************************/
 /* NOTE: currently collapses to first row per patient before linkage -    */
 /* revisit whether this should retain full prescription history instead   */
 
-proc sort data = output.all_bph_drugissue;
+proc sort data = output.all_bph_episodes;
 by patid issuedate;
 run;
 
+/* Is this a valid way of collapsing the dataset? */
 data bph_patients;
-	set output.all_bph_drugissue;
+	set output.all_bph_episodes;
 	by patid issuedate;
 	if first.patid then output;
 	run;
 
 proc sql;
 	create table output.linked_bph_cohort as
-	select a.* , b.linkyear, b.lsoa_e, b.hes_apc_e
+	select a.* 
 	from bph_patients as a 
 	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
 	where b.lsoa_e = 1 and b.hes_apc_e = 1;
+quit;
+
+/*HOW MANY PATIENTS? 252,596*/
+proc sql;
+select count(distinct patid) as "Linked patients"n
+from output.linked_bph_cohort
 quit;
 
 ***********************************************;
@@ -432,6 +464,23 @@ run;
 /**************************************************************************/
 /* STEP 12: Sanity testing - checks steps throughout BPH document         */
 /**************************************************************************/
+
+
+data bph_patients;
+	set output.all_bph_episodes;
+	by patid issuedate;
+	if first.patid then output;
+	run;
+
+data test;
+set bph_patients;
+if aSAH_gp_dt = . then aSAH = 0;
+if aSAH_gp_dt ne . then aSAH = 1;
+run;
+
+proc freq data = test;
+tables exposure * aSAH;
+run;
 
 proc sort data = output.all_bph_drugissue;
 by assumed_duration patid issuedate;

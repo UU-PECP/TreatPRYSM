@@ -108,6 +108,7 @@ data disorders;
     datalines;
     codelist.acidosis, output.acidosis_cohort, acidosis
 	codelist.aids, output.aids_cohort, aids
+	codelist.alcohol, output.alcohol_cohort, alcohol
     codelist.alzheimers_disease, output.alzheimers_disease_cohort, alzheimers_disease
 	codelist.cancer, output.cancer_cohort, cancer
 	codelist.copd, output.copd_cohort, copd

@@ -15,7 +15,6 @@ sapply(df, class)
 
 #set datatypes
 df$tamsulosin <- ifelse(df$drugsubstancename == "Tamsulosin", 1, 0) #make tamsulosin the explicit exposure
-df$gender <- as.factor(df$gender)
 
 #Calculate age at index_date
 df <- df %>% 
@@ -25,7 +24,7 @@ df <- df %>%
 
 #drop variables no longer needed
 df <- df %>%
-  select(-patid, -episode.end, -lcd, -yob, -bph_dt,
+  select(-patid, -episode.end, -lcd, -yob, -bph_dt, -gender,
          -cprd_ddate, -aSAH_gp_dt, -end_of_fu, -drugsubstancename, 
          -lsoa_e, -hes_apc_e, -gender, -linkyear)
 
@@ -45,7 +44,7 @@ summary_data <- summary_data %>%
     incidence_rate = (total_cases / total_follow_up_years) * 1000
   )
 
-sink("amlodipine_pp_incidence.txt")
+sink("bph_pp_incidence.txt")
 print(summary_data)
 sink()
 
@@ -70,51 +69,43 @@ imputed_dataset <- complete(imputed_datasets, 1)
 #Make unbalanced bold in table to highlight imbalance
 t1 <- CreateTableOne(vars = names(imputed_dataset),
                      data = imputed_dataset,
-                     strata = 'amlodipine',
-                     factorVars = c("aSAH", "gender", "acute_renal_failure", "alcohol_abuse", "anal_fissures", "angina_pectoris", "anxiety_disorders", 
-                                    "arrhythmia", "ascites", "cancer", "chronic_kidney_disease", "cirrhosis", "conduction_disorders", "copd", 
-                                    "deep_vein_thrombosis", "depression", "diabetes", "diabetic_nephropathy", "essential_tremors", "glaucoma", 
-                                    "glomerular_diseases", "heart_failure", "hypercalciuria", "hypercholesterolaemia", "hyperthrophic_cardiomyopathy", 
-                                    "hyperthyroidism", "liver_failure", "migraines", "myocardial_infarction", "nephrotic_syndrome", "osteoporosis", 
-                                    "parkinson", "pericarditis", "peripheral_vascular_disease", "portal_hypertension", "proteinuria_and_albuminuria", 
-                                    "pulmonary_hypertension", "pulmonary_oedema", "raynauds_disease", "scleroderma", "stroke", 
-                                    "venous_thromboembolism", 'smk_status'),
+                     strata = 'tamsulosin',
+                     factorVars = c("aSAH", "acidosis", "aids", "alzheimers", "cancer", "copd",
+                                    "stroke", "rheumatological_disease",  "diabetes", "heart_failure", "hypercholesterolemia", "hypertension", 
+                                    "liver_disease", "paralysis", "peptic_ulcer", "pvd", "ckd"),
                      test = F,
                      smd = T)
 
 t1 <- print(t1, printToggle = FALSE, smd = TRUE, quote = T, noSpaces = TRUE)
-write.csv(t1, "amlodipine_pp_table1.csv", row.names = TRUE)
+write.csv(t1, "tamsulosin_pp_table1.csv", row.names = TRUE)
 
 #Calculate propensity scores
 #Currently has no interactions/non-linearities or splines etc.
 #Can examine different balances after model adjustments (smg per strata (e.g. divide up in multiple propscore groups and compare smg per strata))
 
-ps_model <- glm(amlodipine ~ gender + age + acute_renal_failure + alcohol_abuse + anal_fissures + angina_pectoris + anxiety_disorders + arrhythmia + 
-                  ascites + cancer + chronic_kidney_disease + cirrhosis + conduction_disorders + copd + deep_vein_thrombosis + depression + 
-                  diabetes + diabetic_nephropathy + essential_tremors + glaucoma + glomerular_diseases + heart_failure + hypercalciuria + 
-                  hypercholesterolaemia + hyperthrophic_cardiomyopathy + hyperthyroidism + liver_failure + migraines + myocardial_infarction + 
-                  nephrotic_syndrome + osteoporosis + parkinson + pericarditis + peripheral_vascular_disease + portal_hypertension + proteinuria_and_albuminuria + 
-                  pulmonary_hypertension + pulmonary_oedema + raynauds_disease + scleroderma + stroke + venous_thromboembolism + bmi_value + smk_status + diastol_BP + systol_BP + n_consults,
+ps_model <- glm(drugsubstancename ~ age + acidosis + aids + alzheimers + cancer + copd +
+                stroke + rheumatological_disease + diabetes + heart_failure + hypercholesterolemia + hypertension 
+                liver_disease + paralysis + peptic_ulcer + pvd + ckd,
                 data = imputed_dataset, family = binomial)
 
 summary(ps_model)
 imputed_dataset$pscore <- predict(ps_model, type = "response")
 
-# Plot the density of propensity scores by amlodipine with Gaussian smoothing
+# Plot the density of propensity scores by tamsulosin with Gaussian smoothing
 #A lot of overlap. May indicate that groups are already pretty similar, or that we miss important predictors.
 #Distributions too similar.
 #Range is very limited (should ideally go to 1)
 #Double check variables as well and see whether variables transformed
 
-density_plot  <-ggplot(imputed_dataset, aes(x = pscore, fill = factor(amlodipine))) +
+density_plot  <-ggplot(imputed_dataset, aes(x = pscore, fill = factor(drugsubstancename))) +
   geom_density(alpha = 0.25, adjust = 2) +
-  labs(title = "Density of Propensity Scores by Amlodipine User",
+  labs(title = "Density of Propensity Scores by Tamsulosin User",
        x = "Propensity Score",
        y = "Density",
-       fill = "Amlodipine user") +
+       fill = "Tamsulosin user") +
   theme_minimal() +
   scale_fill_manual(values = c("0" = "blue", "1" = "red"), labels = c("Non-User", "User"))
-ggsave("amlodipine_pp_propscore.png", plot = density_plot, width = 8, height = 6, dpi = 300)
+ggsave("tamsulosin_pp_propscore.png", plot = density_plot, width = 8, height = 6, dpi = 300)
 
 #unadjusted fit
 
@@ -129,7 +120,7 @@ summary(cox_pool_crude)
 #Adjusted fit
 cox_fit_adj <- with(
   imputed_datasets,
-  coxph(Surv(fu_days, aSAH) ~ amlodipine + deprivation_decile + 
+  coxph(Surv(fu_days, aSAH) ~ drugsubstancename + deprivation_decile + 
           raynauds_disease + gender + age)
 )
 
@@ -137,17 +128,17 @@ cox_pool_adj <- pool(cox_fit_adj)
 summary(cox_pool_adj)
 
 
-sink("amlodipine_pp_cox_pooled.txt")
+sink("tamsulosin_pp_cox_pooled.txt")
 summary(cox_pool_crude)
 sink()
 
-sink("amlodipine_pp_coxadj_pooled.txt")
+sink("tamsulosin_pp_coxadj_pooled.txt")
 summary(cox_pool_adj)
 sink()
 
 #Plot incidence over time for both users.
 # Kaplan-Meier stratified by exposure
-surv_fit <- survfit(Surv(fu_days, aSAH) ~ amlodipine,
+surv_fit <- survfit(Surv(fu_days, aSAH) ~ drugsubstancename,
                     data = imputed_dataset)
 
 gg_crude <- ggsurvplot(
@@ -158,7 +149,7 @@ gg_crude <- ggsurvplot(
   break.time.by = 365,
   xlab = "Follow-up (days)",
   ylab = "Cumulative incidence of aSAH",
-  legend.labs = c("OtherDHP", "Amlodipine"),
+  legend.labs = c("OtherDrug", "Tamsulosin"),
   palette = c("#d95f02", "#1b9e77"),
   ggtheme = theme_minimal(base_size = 12),
   risk.table = TRUE,
@@ -178,5 +169,5 @@ gg_crude$plot <- gg_crude$plot +
 
 gg_crude
 
-ggsave("amlodipine_pp_km.png", plot = gg_crude$plot, width = 8, height = 6, dpi = 300)
+ggsave("tamsulosin_pp_km.png", plot = gg_crude$plot, width = 8, height = 6, dpi = 300)
 
