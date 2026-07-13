@@ -31,7 +31,7 @@ proc sql;
 	create table indexdate as
 	select patid,
 		   min(issuedate) as index_date format = ddmmyy10.
-	from output.All_bph_drugissue
+	from output.all_bph_episodes
 	group by patid;
 quit;
 
@@ -129,5 +129,3 @@ run;
 
 /* Run the main macro to process all disorders */
 %process_disorders;
-
-

@@ -26,6 +26,8 @@ options fullstimer; /* Display detailed resource usage info in log */
 /* STEP 1: Extract BPH drug records for the current drugissue file        */
 /**************************************************************************/
 
+*** Identify tamsulosin and comparator drug records;
+
 %macro product (var=, atccode =, drugfile =); 
 proc sql;
 	CREATE TABLE codelist.&var._codes AS
@@ -49,10 +51,11 @@ inner join codelist.&var._codes as c on strip(c.prodcodeid) = strip(r.prodcodeid
 quit;
 %mend product;
 
-%product (var=tamsulosin, atccode = 'G04CA%', drugfile = &in); 
-%product (var=finisteride, atccode = 'G04CB%', drugfile = &in); 
+%product (var=tamsulosin, atccode = 'G04CA02', drugfile = &in); 
+%product (var=finisteride, atccode = 'G04CB01', drugfile = &in); 
 %product (var=alfuzosin, atccode = 'G04CA01', drugfile = &in);
 
+*** append drugs records for all drugs and create numeric exposure variable;
 
 data output.bph_drugs;
 set output.tamsulosin_drugs (in = a) output.finisteride_drugs (in = b) output.alfuzosin_drugs (in=c);
@@ -61,6 +64,13 @@ else if b then exposure = 2;
 else if c then exposure = 3;
 run;
 
+proc sort data = output.bph_drugs;
+by exposure;
+run;
+
+proc freq data = output.bph_drugs;
+table exposure;
+run;
 
 /* HOW MANY PATIENTS */
 proc sql;
@@ -73,7 +83,9 @@ quit;
 /* STEP 2: Generate treatment duration and mean daily dose in mg from common dosages file.*/
 /****************************************************************************/
 
-proc sort data = codelist.common_dosages;
+*** Import common_dosages file to extract daily dose variable;
+
+proc sort data = codelist.common_dosages_aurum_dec2025;
 by dosageid;
 run;
 
@@ -82,7 +94,7 @@ by dosageid;
 run;
 
 data bph_dosages;
-merge codelist.common_dosages (in=c) output.bph_drugs (in=d);
+merge codelist.common_dosages_aurum_dec2025 (in=c) output.bph_drugs (in=d);
 by dosageid;
 if d;
 run;
@@ -95,7 +107,13 @@ proc univariate data=bph_dosages;
 	var quantity;
 run;
 
-* borrowed from ADEPT script with permission from Magda *;
+proc univariate data=bph_dosages;
+	var duration;
+run;
+
+
+*** Algorithm to determine reasonable assumed duration per prescription;
+*** borrowed from ADEPT script with permission from Magdalena Gamba *;
 
 data bph_tam_cleaning;
 set bph_dosages;
@@ -116,6 +134,8 @@ run;
 /****************************************************************************/
 /* STEP 3: Join with base_cohort so only patients in our main cohort remain.*/
 /****************************************************************************/
+
+*** Join cleaned prescription records with base cohort; 
 
 PROC SQL;
 CREATE TABLE bph_tam AS
@@ -150,6 +170,7 @@ quit;
 /* bph_dt in base_cohort. */
 /* second step removes identified prevalent users from main dataset */
 
+*** identify prevalent users;
 
 proc sql;
 	create table PrevalentUsers as
@@ -158,8 +179,6 @@ proc sql;
 		inner join bph_tam d2
 		on d1.patid = d2.patid
 	where d2.issuedate between intnx('year', d1.baseline_dt, -1, 'same') and d1.baseline_dt - 1;
-	/* FIXED: added 'same' alignment so the lookback is a true 365-day window, consistent with the NL file,
-	   rather than snapping to January 1st of the prior year */
 quit;
 
 /* HOW MANY PATIENTS */
@@ -169,11 +188,9 @@ from PrevalentUsers
 quit;
 
 
-/* We remove those in PrevalentUsers.                                 */
-/* We only keep prescriptions dated on or after baseline.             */
+***  We remove those in PrevalentUsers.;
+***  We only keep prescriptions dated on or after baseline.;
 
-** lose 40 thousand patients here per file, but seems realistic;
-** NOTE: this is running really slowly **;
 proc sql;
 	create table output.Rx_bph_PostStart as
 	select d1.*,
@@ -201,9 +218,6 @@ select count(distinct patid) as "Step 4: removing prevalent users"n
 from output.Rx_bph_PostStart
 quit;
 
-proc univariate data = output.Rx_bph_PostStart;
-var assumed_duration;
-run;
 
 /**************************************************************************/
 /* STEP 5: Identify earliest prescription date for each patient and exclude multi-drug initiators         */
@@ -223,7 +237,9 @@ quit;
 /* 2) We call this 'EarliestRxAll'.                                       */
 /* 3) If multiple rows share the same earliest date for a patient, we     */
 /*    handle that in the subsequent step.                                 */
-/* why would we want to do this??? */
+/* the earliest Rx will be used for cleaning in the subsequent steps, but then all records will
+be rejoined in the final step for creation of treatment episodes */
+
 proc sql;
 	create table output.EarliestRxBphAll as
 	select p.patid,
@@ -247,6 +263,7 @@ proc sql;
 select count(distinct patid) as "Step 5: First issue date"n
 from output.EarliestRxBphAll
 quit;
+
 *** excluding multi-drug initiators;
 
 proc sql;
@@ -266,33 +283,8 @@ proc sql;
 quit;
 
 
-/*HOW MANY PATIENTS*/
-proc sql;
-select count(distinct patid) as "Step 6: multi-drug"n
-from EarliestRxBph_Filtered
-quit;
-
-proc sql;
-	create table EarliestRxBph_Filtered as
-	select distinct
-	       patid, 
-		   issuedate,
-		   earliest_rx_date,
-		   prodcodeid, 
-		   assumed_duration,
-		   baseline_dt,
-		   exposure,
-		   atc,
-		   regstartdate
-	from EarliestRxBph_Filtered
-	group by patid, exposure
-	having assumed_duration = max(assumed_duration)  /* Prefer longest treatment if two prescriptions on same date */
-	;
-quit;
-
-
 /**************************************************************************/
-/* STEP 6: Exclude if follow-up period is less than 365 days              */
+/* STEP 6: Exclude if run-in period is less than 365 days              */
 /**************************************************************************/
 
 PROC SQL;
@@ -357,16 +349,19 @@ quit;
 * data subset test for shorter runtime;
 
 data lildrugissue;
-set rawdata.drugissue_1;
-where input(patid, 19.) > 1000000000000 and input(patid, 19.) < 1050000000000;
+set rawdata.drugissue_2;
+where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
 run;
 
 data lilpatient;
-set rawdata.patient_1;
-where input(patid, 19.) > 1000000000000 and input(patid, 19.) < 1050000000000;
+set rawdata.patient_2;
+where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
 run;
 
 %drugdata(in=lildrugissue, out=output.bphdrugatc_test)
+
+%let in = lildrugissue
+%let out = output.bphatc_test
 
 * real data input;
 
@@ -402,13 +397,6 @@ output.bphdrugatc_3
 output.bphdrugatc_4;
 run;
 
-**************************
-LC.mg_value * CASE 
-							WHEN CD.daily_dose IS NULL THEN 1 
-							WHEN CD.daily_dose = 0 THEN 0.5 
-							ELSE CD.daily_dose 
-						END AS mean_daily_dose
-**************************;
 
 /*HOW MANY PATIENTS? 264,340*/
 proc sql;
