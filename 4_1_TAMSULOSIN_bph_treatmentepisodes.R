@@ -13,14 +13,13 @@ library(janitor)
 
 ### Reading in data
 
-bphdata_all <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\BPHDRUGATC_TEST.sas7bdat")
+bphdata_all <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\all_bph_episodes.sas7bdat")
 
 
 bphdata <- bphdata_all %>% distinct(patid, issuedate, exposure, .keep_all = TRUE)
+bphdata %>% group_by(exposure) %>% count()
 
-n_distinct(bphdata$patid)
-
-drugs <- c(1, 2, 3)
+drugs <- c(1,2,3)
 
 ### Generating treatment episodes for each drug separately
 
@@ -99,28 +98,6 @@ pp_epi <- treat_epi_all %>% group_by(patid) %>%
                              slice_min(episode.start, n = 1, with_ties = FALSE) %>% 
                              ungroup() %>% mutate(patid = as.character(patid))
 
-## Sanity tests
-n_distinct(pp_epi$patid) # exactly the same number of unique patids identified in file 2_1
-pp_epi %>% mutate(futuredates = if_else(episode.end > ymd("2025-03-31"), "yes", "no")) %>% tabyl(futuredates)
-
-future <- pp_epi %>% mutate(futuredates = if_else(episode.end > ymd("2025-03-31"), "yes", "no")) %>% filter(futuredates == "yes")
-
-
-lildata <- bphdata %>% filter(as.numeric(patid) < 3000000000)
-
-## Cases with episode duration 7300 gap 0
-sub1 <- bphdata_all %>% filter(patid == "2310120545") ## has 2-8 prescriptions every date, does not exist in bph_drugs
-sub2 <- bphdata_all %>% filter(patid == "2384720545") ## also does not exist in bph_drugs. ATC codes are also not matching exposure
-sub3 <- bphdata_all %>% filter(patid == "1045626720637")
-
-
-sub1 <- pp_epi %>% filter(patid == "2310120545")
-sub1 <- treat_epi_all %>% filter(patid == "2310120545")
-
-sub1 %>% group_by(issuedate) %>% summarize(n=n()) %>% arrange(n)
-
-
-
 ### Combine treatment episode info with base cohort
 linkedids <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\linked_bph_cohort.sas7bdat")
 pp_epi <- semi_join(pp_epi, linkedids, by = "patid")
@@ -130,7 +107,6 @@ bph_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_pp
 
 bph_pp <- inner_join(pp_epi, bph_cohort, by = "patid")
 
-test <- anti_join(pp_epi, bph_pp,  by = "patid")
 
 ### Apply end of follow-up rules
 
@@ -143,7 +119,7 @@ bph_pp <- bph_pp %>%
     lubridate::ymd('2025-03-31') < end_of_fu ~ lubridate::ymd('2025-03-31')
   )) %>% 
   mutate(aSAH = if_else(!is.na(aSAH_gp_dt) & aSAH_gp_dt <= end_of_fu, 1, 0)) %>% 
-  mutate(fu_days = end_of_fu - bph_dt + 1)
+  mutate(fu_days = end_of_fu - baseline_dt + 1)
 
 bph_filters <- bph_pp %>% 
   filter(episode.start < end_of_fu) %>% 

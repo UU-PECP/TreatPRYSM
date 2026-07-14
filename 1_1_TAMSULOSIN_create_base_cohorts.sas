@@ -216,7 +216,7 @@ from RareDisease_cod;
 quit;
 
 proc sql;
-	CREATE TABLE rarediseasecases AS
+	CREATE TABLE output.rarediseasecases AS
 	SELECT r.*
 	FROM output.clinical as r
 	inner join RareDisease_char as c on strip(c.newmedcodeid) = strip(r.medcodeid);
@@ -306,60 +306,64 @@ data output.bph_cohort;
 	format censordate ddmmyy10.;
 	run;
 
-* STEP 9: Exclude patients under 18 years old at baseline (aprox_age > 17 retains adults) *;
-*NOTE HOW MANY *;
+* STEP 9: Exclude patients under 18 years old at baseline (aprox_age > 17 retains adults), rare diseases (e.g. Loeys-Dietz, Marfan syndrome) , and non-males  *;
+
 data output.bph_cohort;
 set output.bph_cohort;
 aprox_age = year(baseline_dt) - yob;
 if aprox_age >= 18;
 run;
 
-* STEP 10: Exclude rare disease cases (e.g. Loeys-Dietz, Marfan syndrome) *;
-* NOTE HOW MANY *;
-* ### EXCLUDED *;
 proc sql;
 	create table bph_rarediseaseexc as
 	select *
 	from output.bph_cohort a
 	where not exists (
 		select 1 
-		from rarediseasecases b
+		from output.rarediseasecases b
 		where a.patid = b.patid
 		);
 quit;
 
+data bph_genderexc;
+set bph_rarediseaseexc;
+where gender = "1";
+run;
+
 *THE FINISHED PRODUCT*;
 
 data output.bph_cohort;
-set bph_rarediseaseexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
+set bph_genderexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
 run;
 
-* ### NUMBER OF PATIENTS ;
-***********************************************;
-**************** SANITY CHECKS ****************;
-***********************************************;
-proc SQL;
-	CREATE TABLE asahonly AS
-	SELECT bc.*
-	FROM output.bph_cohort AS bc
-	WHERE aSAH_gp_dt IS NOT NULL;
+
+*******************************************************************************
+
+**************************** HES APC DATA LINKAGE *****************************
+
+*******************************************************************************;
+
+proc sql;
+	create table output.linked_bph_cohort as
+	select a.* 
+	from output.bph_cohort as a 
+	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
+	where b.lsoa_e = 1 and b.hes_apc_e = 1;
 quit;
 
-
-*where lsoa_e = 1 and hes_apc_e = 1;
-
-Proc freq data = rawdata.linkage_eligibility ;
-table hes_apc_e*lsoa_e ;
-run;
-
-
-	*Quick sanity check to see whether there are no duplicates;
-	*No duplicates! ;
 proc sql;
-	create table test as
-	select distinct patid
-	from output.bph_cohort;
-run;
+select count(distinct patid) as "Linked patients"n
+from output.linked_bph_cohort
+quit;
 
-proc contents data = test;
+***********************************************;
+************** EXPORTING PATIDS ***************;
+***********************************************;
+
+
+*final count: 253 thousand patients;
+proc export data = output.linked_bph_cohort (keep = patid)
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
+dbms=csv
+replace;
 run;

@@ -45,37 +45,63 @@ proc sql;
 		   r.quantity,
 		   r.duration,
 		   r.prodcodeid,
-		   c.atc
+		   c.atc,
 	FROM &drugfile as r  
 inner join codelist.&var._codes as c on strip(c.prodcodeid) = strip(r.prodcodeid);
 quit;
+
+
 %mend product;
 
 %product (var=tamsulosin, atccode = 'G04CA02', drugfile = &in); 
-%product (var=finisteride, atccode = 'G04CB01', drugfile = &in); 
-%product (var=alfuzosin, atccode = 'G04CA01', drugfile = &in);
+
+%product (var=finasteride_mono1, atccode = 'G04CB01', drugfile = &in); 
+%product (var=finasteride_mono2, atccode = 'D11AX10', drugfile = &in);
+
+%product (var=alfuzosin, atccode = 'G04CA01', drugfile = &in);  
+
+
+
 
 *** append drugs records for all drugs and create numeric exposure variable;
 
-data output.bph_drugs;
-set output.tamsulosin_drugs (in = a) output.finisteride_drugs (in = b) output.alfuzosin_drugs (in=c);
+data appended_drugs;
+set output.tamsulosin_drugs (in = a) 
+output.alfuzosin_drugs (in=b) 
+output.finasteride_mono1_drugs (in=c)  
+output.finasteride_mono2_drugs (in=d);
 if a then exposure = 1;
 else if b then exposure = 2;
-else if c then exposure = 3;
+else if c or d then exposure = 3;
 run;
 
-proc sort data = output.bph_drugs;
-by exposure;
-run;
 
-proc freq data = output.bph_drugs;
-table exposure;
+*** find mg value ;
+
+data output.bph_drugs;
+    set appended_drugs;  
+    length unit_found $20;
+
+    if not missing(strength) then do;
+        /* First number in the string (handles decimals) */
+        mg_value = input(scan(strength, 1, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/'), best12.);
+
+        /* First unit word: letters immediately after the first number */
+        unit_found = scan(compress(strength, '0123456789. '), 1, '/');
+
+        /* Convert everything to mg */
+        if lowcase(unit_found) in ('microgram', 'micrograms', 'mcg') then mg_value = mg_value / 1000;
+        else if lowcase(unit_found) in ('gram', 'g') then mg_value = mg_value * 1000;
+        /* mg stays as-is */
+    end;
+
+    drop unit_found;
 run;
 
 /* HOW MANY PATIENTS */
 proc sql;
 select count(distinct patid) as "Step 1: bph drugs"n
-from output.bph_drugs
+from output.bph_drugs;
 quit;
 
 
@@ -94,9 +120,9 @@ by dosageid;
 run;
 
 data bph_dosages;
-merge codelist.common_dosages_aurum_dec2025 (in=c) output.bph_drugs (in=d);
+merge codelist.common_dosages_aurum_dec2025 (in=a) output.bph_drugs (in=b);
 by dosageid;
-if d;
+if b;
 run;
 
 proc univariate data=bph_dosages;
@@ -111,12 +137,19 @@ proc univariate data=bph_dosages;
 	var duration;
 run;
 
+*** calculate means daily dose;
+
+data bph_dosages_mg;
+set bph_dosages;
+if daily_dose > 0 then mean_daily_dose = mg_value*daily_dose;
+else mean_daily_dose = mg_value;
+run;
 
 *** Algorithm to determine reasonable assumed duration per prescription;
 *** borrowed from ADEPT script with permission from Magdalena Gamba *;
 
 data bph_tam_cleaning;
-set bph_dosages;
+set bph_dosages_mg;
 if daily_dose > 5 or daily_dose = . then daily_dose = 1;
 if daily_dose = 0 then daily_dose = 0.5;
 if quantity > 90 then quantity = 90;
@@ -147,9 +180,11 @@ T.dosageid,
 T.quantity,
 T.assumed_duration,
 T.prodcodeid,
-BC.regstartdate
+T.mg_value,
+BC.regstartdate,
+BC.baseline_dt
 	FROM bph_tam_cleaning AS T
-	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
+	INNER JOIN output.linked_bph_cohort AS BC ON BC.patid = T.patid
 ORDER BY T.assumed_duration, T.patid, T.issuedate; 
 quit;
 
@@ -174,11 +209,9 @@ quit;
 
 proc sql;
 	create table PrevalentUsers as
-	select distinct d1.patid
-	from output.bph_cohort d1
-		inner join bph_tam d2
-		on d1.patid = d2.patid
-	where d2.issuedate between intnx('year', d1.baseline_dt, -1, 'same') and d1.baseline_dt - 1;
+	select distinct patid
+	from bph_tam
+	where issuedate between intnx('year', baseline_dt, -1, 'same') and baseline_dt - 1;
 quit;
 
 /* HOW MANY PATIENTS */
@@ -193,22 +226,14 @@ quit;
 
 proc sql;
 	create table output.Rx_bph_PostStart as
-	select d1.*,
-		   d2.issuedate,
-		   d2.assumed_duration,
-		   d2.prodcodeid,
-		   d2.quantity,
-		   d2.exposure,
-		   d2.atc
-	from output.bph_cohort d1
-		inner join bph_tam d2
-		on d1.patid = d2.patid
+	select *
+	from bph_tam b
 	where not exists (
 		select 1
 		from PrevalentUsers p
-		where p.patid = d1.patid
+		where p.patid = b.patid
 		)
-	and d2.issuedate >= d1.baseline_dt
+	and issuedate >= baseline_dt
 	;
 quit;
 
@@ -227,18 +252,18 @@ quit;
 proc sql;
 	create table output.BphEarliestDate as
 	select patid,
-		   min(issuedate) as earliest_rx_date format = ddmmyy10.
+		   min(issuedate) as indexdate format = ddmmyy10.
 	from output.Rx_bph_PostStart
 	group by patid;
 quit;
 
 
-/* 1) We only keep rows where issuedate = earliest_rx_date.               */
+/* 1) We only keep rows where issuedate = indexdate.               */
 /* 2) We call this 'EarliestRxAll'.                                       */
-/* 3) If multiple rows share the same earliest date for a patient, we     */
-/*    handle that in the subsequent step.                                 */
 /* the earliest Rx will be used for cleaning in the subsequent steps, but then all records will
 be rejoined in the final step for creation of treatment episodes */
+
+*** includes 2 multi-drug initiators;
 
 proc sql;
 	create table output.EarliestRxBphAll as
@@ -247,14 +272,14 @@ proc sql;
 		   p.assumed_duration,
 		   p.prodcodeid,
 		   p.baseline_dt,
-		   e.earliest_rx_date,
+		   e.indexdate,
 		   p.regstartdate,
 		   p.exposure,
 		   p.atc
-	from output.Rx_bph_PostStart as p
-		left join output.BphEarliestDate as e
+	from output.BphEarliestDate as e
+		left join output.Rx_bph_PostStart as p 
 		on p.patid = e.patid
-where p.issuedate = e.earliest_rx_date;
+where p.issuedate = e.indexdate;
 quit;
 
 
@@ -279,7 +304,7 @@ proc sql;
 	create table EarliestRxBph_Filtered as
 	select *
 	from output.EarliestRxBphAll
-	where patid not in (select patid from output.ExcludeMulti);
+	where patid not in (select patid from ExcludeMulti);
 quit;
 
 
@@ -291,7 +316,7 @@ PROC SQL;
 create table EarliestRxBph_Filtered AS
 select * 
 from EarliestRxBph_Filtered
-having earliest_rx_date - regstartdate > 365;
+having indexdate - regstartdate > 365;
 quit;
 
 /*HOW MANY PATIENTS*/
@@ -311,18 +336,18 @@ quit;
 /* NOTE: Jos's version requires both hospital and gp data so I have written new script myself for the timebeing*/
 
 *proc sql;
-*CREATE TABLE EarliestRx_aSah_Exclusion AS
+*CREATE TABLE EarliestRxBph_Filtered AS
 SELECT d1.* , d2.patid, d2.aSAH_gp_dt
-FROM EarliestRx_washout as d1
-INNER JOIN output.bph_cohort as d2 
+FROM EarliestRxBph_Filtered as d1
+INNER JOIN output.linked_bph_cohort as d2 
 ON d1.patid = d2.patid
-	WHERE d2.aSAH_gp_dt > earliest_rx_date or d2.aSAH_gp_dt is NULL;
+	WHERE d2.aSAH_gp_dt > indexdate or d2.aSAH_gp_dt is NULL;
 *quit;
 
 /*HOW MANY PATIENTS*/
 *proc sql;
 *select count(distinct patid) as "Step 8: prior aSAH"n
-from EarliestRx_aSah_Exclusion 
+from EarliestRxBph_Filtered 
 quit;
 
 
@@ -345,23 +370,6 @@ quit;
 /**************************************************************************/
 /* STEP 9: Combine all four drugissue files                              */
 /**************************************************************************/
-
-* data subset test for shorter runtime;
-
-data lildrugissue;
-set rawdata.drugissue_2;
-where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
-run;
-
-data lilpatient;
-set rawdata.patient_2;
-where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
-run;
-
-%drugdata(in=lildrugissue, out=output.bphdrugatc_test)
-
-%let in = lildrugissue
-%let out = output.bphatc_test
 
 * real data input;
 
@@ -398,96 +406,24 @@ output.bphdrugatc_4;
 run;
 
 
-/*HOW MANY PATIENTS? 264,340*/
+/* HOW MANY PATIENTS? 264,340 */
 proc sql;
 select count(distinct patid) as "Final Product"n
 from output.all_bph_episodes
 quit;
 
-/**************************************************************************/
-/* STEP 10: Extract patids of patients with linked HES data               */
-/**************************************************************************/
-/* NOTE: currently collapses to first row per patient before linkage -    */
-/* revisit whether this should retain full prescription history instead   */
 
-proc sort data = output.all_bph_episodes;
-by patid issuedate;
+* data subset test for shorter runtime;
+
+data output.lildrugissue;
+set rawdata.drugissue_2;
+where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
 run;
 
-/* Is this a valid way of collapsing the dataset? */
-data bph_patients;
-	set output.all_bph_episodes;
-	by patid issuedate;
-	if first.patid then output;
-	run;
-
-proc sql;
-	create table output.linked_bph_cohort as
-	select a.* 
-	from bph_patients as a 
-	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
-	where b.lsoa_e = 1 and b.hes_apc_e = 1;
-quit;
-
-/*HOW MANY PATIENTS? 252,596*/
-proc sql;
-select count(distinct patid) as "Linked patients"n
-from output.linked_bph_cohort
-quit;
-
-***********************************************;
-************** EXPORTING PATIDS ***************;
-***********************************************;
-
-
-*final count: 253 thousand patients;
-proc export data = output.linked_bph_cohort (keep = patid)
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
-dbms=csv
-replace;
+data output.lilpatient;
+set rawdata.patient_2;
+where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
 run;
 
+%drugdata(in=output.lildrugissue, out=output.bphdrugatc_test)
 
-
-/**************************************************************************/
-/* STEP 12: Sanity testing - checks steps throughout BPH document         */
-/**************************************************************************/
-
-
-data bph_patients;
-	set output.all_bph_episodes;
-	by patid issuedate;
-	if first.patid then output;
-	run;
-
-data test;
-set bph_patients;
-if aSAH_gp_dt = . then aSAH = 0;
-if aSAH_gp_dt ne . then aSAH = 1;
-run;
-
-proc freq data = test;
-tables exposure * aSAH;
-run;
-
-proc sort data = output.all_bph_drugissue;
-by assumed_duration patid issuedate;
-run;
-
-*** how many records still have an odd duration?***;
-
-data test;
-set output.all_bph_drugissue;
-if assumed_duration < 7 then oddvalues = "TRUE";
-else if assumed_duration >= 7 then oddvalues = "FALSE";
-run;
-
-proc freq data = output.all_bph_drugissue;
-tables oddvalues;
-run; */ only 0.07*/;
-
-
-data test;
-set output.all_bph_drugissue;
-if assumed_duration < 7 then assumed_duration = 30;
-run;

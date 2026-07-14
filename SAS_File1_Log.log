@@ -1,0 +1,472 @@
+
+1252  *Step 4: TEMPORARY find aSAH cases in clinical file;
+1253      * replace with HES data when available;
+1254  proc sql;
+1255      CREATE TABLE output.aSAH_gp AS
+1256      SELECT
+1257          clin.patid, MIN(clin.obsdate) AS aSAH_dt format=ddmmyy10.
+1258      FROM
+1259          output.clinical AS clin
+1260      WHERE clin.medcodeId IN (
+1261          "481028017", "300257016", "123511000006114", "123441000006112", "320735017",
+1262          "123481000006118", "123521000006118", "123491000006115", "300244012",
+1263          "300253017", "300935019", "300936018"
+1264  )
+1265      GROUP BY clin.patid;
+NOTE: Table OUTPUT.ASAH_GP created, with 4615 rows and 2 columns.
+
+1266  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           4:53.59
+      user cpu time       49.65 seconds
+      system cpu time     17.89 seconds
+      memory              5554.76k
+      OS Memory           37888.00k
+      Timestamp           07/13/2026 04:54:47 PM
+      Step Count                        141  Switch Count  0
+
+
+1267
+1268
+1269  *Build rare disease codelist once, used by both BPH and NL cohorts below;
+1270
+1271  data RareDisease_cod;
+1272      infile "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt" dsd
+1272! dlm='09'x firstobs=2 truncover;
+1273      length medcodeid 8 ;
+1274      input medcodeid :19. ;
+1275  run;
+
+NOTE: The infile "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt" is:
+      Filename=F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt,
+      RECFM=V,LRECL=32767,File Size (bytes)=1695,
+      Last Modified=30Jun2026:17:01:57,
+      Create Time=25Jun2026:16:27:21
+
+NOTE: 17 records were read from the infile
+      "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt".
+      The minimum record length was 66.
+      The maximum record length was 119.
+NOTE: The data set WORK.RAREDISEASE_COD has 17 observations and 1 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.01 seconds
+      memory              495.73k
+      OS Memory           32764.00k
+      Timestamp           07/13/2026 04:54:47 PM
+      Step Count                        142  Switch Count  0
+
+
+1276
+1277  proc sql;
+1278  create table RareDisease_char as
+1279  select put(medcodeid, 19.) as newmedcodeid
+1280  from RareDisease_cod;
+NOTE: Table WORK.RAREDISEASE_CHAR created, with 17 rows and 1 columns.
+
+1281  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              5341.67k
+      OS Memory           37888.00k
+      Timestamp           07/13/2026 04:54:47 PM
+      Step Count                        143  Switch Count  0
+
+
+1282
+1283  proc sql;
+1284      CREATE TABLE rarediseasecases AS
+1285      SELECT r.*
+1286      FROM output.clinical as r
+1287      inner join RareDisease_char as c on strip(c.newmedcodeid) = strip(r.medcodeid);
+NOTE: Table WORK.RAREDISEASECASES created, with 1792 rows and 4 columns.
+
+1288  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           7:51.66
+      user cpu time       3:50.21
+      system cpu time     19.84 seconds
+      memory              5592.14k
+      OS Memory           37888.00k
+      Timestamp           07/13/2026 05:02:39 PM
+      Step Count                        144  Switch Count  0
+
+
+1289
+1290
+1291  *******************************************************************************
+1292
+1293  **************************** BPH COHORT GENERATION ****************************
+1294
+1295  *******************************************************************************;
+1296
+1297  * STEP 5: Identify first BPH diagnosis date for each patient before end of study period;
+1298
+1299      *NOTE: generates 54 patients with missing bph dates not in initial cohort file;
+1300
+1301  proc sql;
+1302      CREATE TABLE output.bph_cases AS
+1303      SELECT
+1304          cli.patid, MIN(cli.obsdate) AS bph_dt format=ddmmyy10.
+1305      FROM
+1306          output.clinical AS cli
+1307      INNER JOIN
+1308          codelist.bph AS bph
+1309          ON cli.medcodeId = bph.medcode
+1310          WHERE cli.obsdate < '31MAR2025'd
+1311      GROUP BY cli.patid;
+ERROR: Column medcode could not be found in the table/view identified with the correlation name
+       BPH.
+ERROR: Column medcode could not be found in the table/view identified with the correlation name
+       BPH.
+1312  quit;
+NOTE: The SAS System stopped processing this step because of errors.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.07 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              5607.68k
+      OS Memory           37888.00k
+      Timestamp           07/13/2026 05:02:39 PM
+      Step Count                        145  Switch Count  0
+
+1313
+1314
+1315
+1316  * STEP 6: Restrict initial cohort to patients with a BPH diagnosis;
+1317
+
+
+1318  PROC SQL;
+1319      CREATE TABLE output.BPH_initial AS
+1320      SELECT
+1321          bc.patid,
+1322          bc.gender,
+1323          bc.yob,
+1324          bc.lcd,
+1325          bc.cprd_ddate,
+1326          bc.regstartdate,
+1327          bc.regenddate,
+1328          bph_coh.bph_dt
+1329      FROM
+1330          output.initial_cohort AS bc
+1331      INNER JOIN
+1332          output.bph_cases AS bph_coh
+1333          ON bc.patid = bph_coh.patid;
+NOTE: Table OUTPUT.BPH_INITIAL created, with 646655 rows and 8 columns.
+
+1334  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           1.34 seconds
+      user cpu time       0.29 seconds
+      system cpu time     0.25 seconds
+      memory              52175.15k
+      OS Memory           83868.00k
+      Timestamp           07/13/2026 05:02:40 PM
+      Step Count                        146  Switch Count  0
+
+
+1335
+1336
+1337  * STEP 7: Retrieve aSAH cases (GP-recorded, temporary until HES APC incorporated) *;
+1338
+1339  proc SQL;
+1340      CREATE TABLE output.bph_cohort AS
+1341      SELECT bc.*,
+1342             aSAH.aSAH_dt as aSAH_gp_dt
+1343      FROM output.BPH_initial AS bc
+1344      LEFT OUTER JOIN output.aSAH_gp AS aSAH ON bc.patid = aSAH.patid;
+NOTE: Table OUTPUT.BPH_COHORT created, with 646655 rows and 9 columns.
+
+1345  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           1.04 seconds
+      user cpu time       0.34 seconds
+      system cpu time     0.26 seconds
+      memory              82902.26k
+      OS Memory           113812.00k
+      Timestamp           07/13/2026 05:02:41 PM
+      Step Count                        147  Switch Count  0
+
+
+1346
+1347
+1348  * 3206 aSAH cases in this cohort;
+1349  proc SQL;
+1350  SELECT COUNT(*) FROM output.bph_cohort
+1351  WHERE aSAH_gp_dt IS NOT NULL;
+1352  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.29 seconds
+      user cpu time       0.07 seconds
+      system cpu time     0.01 seconds
+      memory              5414.96k
+      OS Memory           37888.00k
+      Timestamp           07/13/2026 05:02:42 PM
+      Step Count                        148  Switch Count  0
+
+
+1353
+1354
+1355  * STEP 8: Define baseline date and censor date *;
+1356
+1357  data output.bph_cohort;
+1358      set output.bph_cohort;
+1359
+1360      *Define baseline dt as the later of registration start date or bph_dt, floored at study
+1360! start (31OCT2002);
+1361      informat baseline_dt DDMMYY10.;
+1362      baseline_dt = max(of regstartdate bph_dt);
+1363      if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
+1364      format baseline_dt DDMMYY10.;
+1365      run;
+
+NOTE: There were 646655 observations read from the data set OUTPUT.BPH_COHORT.
+NOTE: The data set OUTPUT.BPH_COHORT has 646655 observations and 10 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.84 seconds
+      user cpu time       0.04 seconds
+      system cpu time     0.18 seconds
+      memory              641.46k
+      OS Memory           32764.00k
+      Timestamp           07/13/2026 05:02:43 PM
+      Step Count                        149  Switch Count  0
+
+
+1366
+1367  data output.bph_cohort;
+1368      set output.bph_cohort;
+1369      studyend = '31MAR2025'd;
+1370      censordate = min(regenddate, cprd_ddate, lcd, studyend);
+1371      format censordate ddmmyy10.;
+1372      run;
+
+NOTE: There were 646655 observations read from the data set OUTPUT.BPH_COHORT.
+NOTE: The data set OUTPUT.BPH_COHORT has 646655 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.98 seconds
+      user cpu time       0.06 seconds
+      system cpu time     0.14 seconds
+      memory              640.04k
+      OS Memory           32764.00k
+      Timestamp           07/13/2026 05:02:44 PM
+      Step Count                        150  Switch Count  0
+
+
+1373
+1374  * STEP 9: Exclude patients under 18 years old at baseline (aprox_age > 17 retains adults),
+1374! rare diseases (e.g. Loeys-Dietz, Marfan syndrome) , and non-males  *;
+1375  *NOTE HOW MANY *;
+1376  data output.bph_cohort;
+1377  set output.bph_cohort;
+1378  aprox_age = year(baseline_dt) - yob;
+1379  if aprox_age >= 18;
+1380  run;
+
+NOTE: There were 646655 observations read from the data set OUTPUT.BPH_COHORT.
+NOTE: The data set OUTPUT.BPH_COHORT has 646621 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           1.18 seconds
+      user cpu time       0.06 seconds
+      system cpu time     0.28 seconds
+      memory              639.95k
+      OS Memory           32764.00k
+      Timestamp           07/13/2026 05:02:45 PM
+      Step Count                        151  Switch Count  0
+
+
+1381
+1382  * NOTE HOW MANY *;
+1383  * ### EXCLUDED *;
+1384  proc sql;
+1385      create table bph_rarediseaseexc as
+1386      select *
+1387      from output.bph_cohort a
+1388      where not exists (
+1389          select 1
+1390          from rarediseasecases b
+1391          where a.patid = b.patid
+1392          );
+NOTE: Table WORK.BPH_RAREDISEASEEXC created, with 646404 rows and 13 columns.
+
+1393  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           1:56.89
+      user cpu time       36.26 seconds
+      system cpu time     1:20.32
+      memory              5670.54k
+      OS Memory           37888.00k
+      Timestamp           07/13/2026 05:04:42 PM
+      Step Count                        152  Switch Count  0
+
+
+1394
+1395  data bph_genderexc;
+1396  set bph_bph_rarediseaseexc;
+ERROR: File WORK.BPH_BPH_RAREDISEASEEXC.DATA does not exist.
+1397  where gender = 1;
+1398  run;
+
+NOTE: The SAS System stopped processing this step because of errors.
+WARNING: The data set WORK.BPH_GENDEREXC may be incomplete.  When this step was stopped there
+         were 0 observations and 0 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.01 seconds
+      memory              377.57k
+      OS Memory           32764.00k
+      Timestamp           07/13/2026 05:04:42 PM
+      Step Count                        153  Switch Count  0
+
+
+1399
+1400  *THE FINISHED PRODUCT*;
+1401
+1402  data output.bph_cohort;
+1403  set bph_rarediseaseexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
+1404  run;
+
+NOTE: There were 646404 observations read from the data set WORK.BPH_RAREDISEASEEXC.
+NOTE: The data set OUTPUT.BPH_COHORT has 646404 observations and 6 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.51 seconds
+      user cpu time       0.04 seconds
+      system cpu time     0.14 seconds
+      memory              636.42k
+      OS Memory           32764.00k
+      Timestamp           07/13/2026 05:04:42 PM
+      Step Count                        154  Switch Count  0
+
+
+1405
+1406
+1407  *******************************************************************************
+1408
+1409  **************************** HES APC DATA LINKAGE *****************************
+1410
+1411  *******************************************************************************;
+1412
+1413  proc sql;
+1414      create table output.linked_bph_cohort as
+1415      select a.*
+1416      from output.bph_cohort as a
+1417      inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
+1418      where b.lsoa_e = 1 and b.hes_apc_e = 1;
+NOTE: Table OUTPUT.LINKED_BPH_COHORT created, with 606190 rows and 6 columns.
+
+1419  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           50.28 seconds
+      user cpu time       19.32 seconds
+      system cpu time     5.60 seconds
+      memory              64143.26k
+      OS Memory           95804.00k
+      Timestamp           07/13/2026 05:05:32 PM
+      Step Count                        155  Switch Count  0
+
+
+1420
+1421  /*HOW MANY PATIENTS? 252,596*/
+1422  proc sql;
+1423  select count(distinct patid) as "Linked patients"n
+1424  from output.linked_bph_cohort
+1425  quit;
+1426
+1427  ***********************************************;
+1428  ************** EXPORTING PATIDS ***************;
+1429  ***********************************************;
+1430
+1431
+1432  *final count: 253 thousand patients;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.32 seconds
+      user cpu time       0.21 seconds
+      system cpu time     0.06 seconds
+      memory              57262.46k
+      OS Memory           97020.00k
+      Timestamp           07/13/2026 05:05:33 PM
+      Step Count                        156  Switch Count  0
+
+
+1433  proc export data = output.linked_bph_cohort (keep = patid)
+1434  outfile = "C:\Users\Wyatt003\OneDrive - Universiteit
+1434! Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
+1435  dbms=csv
+1436  replace;
+1437  run;
+
+1438   /**********************************************************************
+1439   *   PRODUCT:   SAS
+1440   *   VERSION:   9.4
+1441   *   CREATOR:   External File Interface
+1442   *   DATE:      13JUL26
+1443   *   DESC:      Generated SAS Datastep Code
+1444   *   TEMPLATE SOURCE:  (None Specified.)
+1445   ***********************************************************************/
+1446      data _null_;
+1447      %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
+1448      %let _EFIREC_ = 0;     /* clear export record count macro variable */
+1449      file 'C:\Users\Wyatt003\OneDrive - Universiteit
+1449! Utrecht\Documents\Codelists\LinkedPatients_BPH.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+1450      if _n_ = 1 then        /* write column names or labels */
+1451       do;
+1452         put
+1453            "patid"
+1454         ;
+1455       end;
+1456     set  OUTPUT.LINKED_BPH_COHORT(keep = patid)   end=EFIEOD;
+1457         format patid $19. ;
+1458       do;
+1459         EFIOUT + 1;
+1460         put patid $ ;
+1461         ;
+1462       end;
+1463      if _ERROR_ then call symputx('_EFIERR_',1);  /* set ERROR detection macro variable */
+1464      if EFIEOD then call symputx('_EFIREC_',EFIOUT);
+1465      run;
+
+NOTE: The file 'C:\Users\Wyatt003\OneDrive - Universiteit
+      Utrecht\Documents\Codelists\LinkedPatients_BPH.csv' is:
+
+      Filename=C:\Users\Wyatt003\OneDrive - Universiteit
+      Utrecht\Documents\Codelists\LinkedPatients_BPH.csv,
+      RECFM=V,LRECL=32767,File Size (bytes)=0,
+      Last Modified=13Jul2026:17:05:35,
+      Create Time=13Jul2026:17:05:35
+
+NOTE: 606191 records were written to the file 'C:\Users\Wyatt003\OneDrive - Universiteit
+      Utrecht\Documents\Codelists\LinkedPatients_BPH.csv'.
+      The minimum record length was 5.
+      The maximum record length was 14.
+NOTE: There were 606190 observations read from the data set OUTPUT.LINKED_BPH_COHORT.
+NOTE: DATA statement used (Total process time):
+      real time           0.20 seconds
+      user cpu time       0.11 seconds
+      system cpu time     0.03 seconds
+      memory              8081.17k
+      OS Memory           36612.00k
+      Timestamp           07/13/2026 05:05:35 PM
+      Step Count                        157  Switch Count  0
+
+
+606190 records created in C:\Users\Wyatt003\OneDrive - Universiteit
+Utrecht\Documents\Codelists\LinkedPatients_BPH.csv from OUTPUT.LINKED_BPH_COHORT.
+
+
+NOTE: "C:\Users\Wyatt003\OneDrive - Universiteit
+      Utrecht\Documents\Codelists\LinkedPatients_BPH.csv" file was successfully created.
+NOTE: PROCEDURE EXPORT used (Total process time):
+      real time           1.96 seconds
+      user cpu time       0.17 seconds
+      system cpu time     0.28 seconds
+      memory              8081.17k
+      OS Memory           36868.00k
+      Timestamp           07/13/2026 05:05:35 PM
+      Step Count                        157  Switch Count  7
+
+
+
