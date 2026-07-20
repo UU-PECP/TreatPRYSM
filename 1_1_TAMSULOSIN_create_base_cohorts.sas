@@ -81,6 +81,8 @@ set base_cohort_1
 	base_cohort_4;
 run;
 
+		** 921729 patients ;
+
 *STEP 2: Exclude patients from Wales and extract lcd; 
 /*Import practice records */
 
@@ -130,6 +132,8 @@ set practice_1
 	practice_4;
 run;
 
+		** 1939 practices;
+
 data test3;
 set output.practice;
 where region = 10;
@@ -151,7 +155,7 @@ FROM output.initial_cohort AS coh
 LEFT OUTER JOIN
 		output.practice AS pra
 		ON coh.pracid = pra.pracid
-        WHERE pra.region ne 10; /* FIXED: was unqualified "region", now correctly references pra.region */
+        WHERE pra.region ne 10; /* no Welsh practices in data, this step is technically unnecessary */
 quit;
 
 
@@ -182,7 +186,11 @@ data output.clinical;
 	clinical_3
 	clinical_4;
 run;
+		** 1423855848 records; 
 
+proc datasets library = work kill nolist;
+run;
+quit;
 
 *Step 4: TEMPORARY find aSAH cases in clinical file;
 	* replace with HES data when available;
@@ -222,6 +230,17 @@ proc sql;
 	inner join RareDisease_char as c on strip(c.newmedcodeid) = strip(r.medcodeid);
 quit;
 
+*** TESTING ***;
+
+data output.initial_cohort_TEST;
+set rawdata.patient_2;
+where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
+run;
+
+data output.clinical_TEST;
+set rawdata.observation_2;
+where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
+run;
 
 *******************************************************************************
 
@@ -231,8 +250,8 @@ quit;
 
 * STEP 5: Identify first BPH diagnosis date for each patient before end of study period;
 
-	*NOTE: generates 54 patients with missing bph dates not in initial cohort file;
-
+	*NOTE: generates 54 patients with missing bph dates;
+	
 proc sql;
 	CREATE TABLE output.bph_cases AS
 	SELECT 
@@ -246,6 +265,16 @@ proc sql;
 	GROUP BY cli.patid;
 quit;
 
+proc sort data = output.bph_cases;
+by bph_dt;
+run;
+
+/* HOW MANY PATIENTS */
+proc sql;
+select count(distinct patid) as "Step 5: bph in clinical"n
+from output.bph_cases;
+quit;
+		**644621 patients;
 
 
 * STEP 6: Restrict initial cohort to patients with a BPH diagnosis;
@@ -267,7 +296,7 @@ PROC SQL;
 		output.bph_cases AS bph_coh
 		ON bc.patid = bph_coh.patid;
 quit;
-
+		**644621 patients;
 
 * STEP 7: Retrieve aSAH cases (GP-recorded, temporary until HES APC incorporated) *;
 
@@ -280,12 +309,12 @@ proc SQL;
 quit;
 
 
-* 3206 aSAH cases in this cohort;
+
 proc SQL;
 SELECT COUNT(*) FROM output.bph_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
 quit;
-
+		** 3206 aSAH cases in this cohort;
 
 * STEP 8: Define baseline date and censor date *;
 
@@ -308,16 +337,25 @@ data output.bph_cohort;
 
 * STEP 9: Exclude patients under 18 years old at baseline (aprox_age > 17 retains adults), rare diseases (e.g. Loeys-Dietz, Marfan syndrome) , and non-males  *;
 
-data output.bph_cohort;
+data bph_ageexc;
 set output.bph_cohort;
 aprox_age = year(baseline_dt) - yob;
 if aprox_age >= 18;
 run;
 
+
+/* HOW MANY PATIENTS */
+proc sql;
+select count(distinct patid) as "Step 9: no kids"n
+from bph_ageexc;
+quit;
+		**644587 patients;
+
+
 proc sql;
 	create table bph_rarediseaseexc as
 	select *
-	from output.bph_cohort a
+	from bph_ageexc a
 	where not exists (
 		select 1 
 		from output.rarediseasecases b
@@ -325,15 +363,29 @@ proc sql;
 		);
 quit;
 
+/* HOW MANY PATIENTS */
+proc sql;
+select count(distinct patid) as "Step 9: no rare disease"n
+from bph_rarediseaseexc;
+quit;
+		**644370 patients;
+
 data bph_genderexc;
 set bph_rarediseaseexc;
 where gender = "1";
 run;
 
+/* HOW MANY PATIENTS */
+proc sql;
+select count(distinct patid) as "Step 9: males only"n
+from bph_genderexc;
+quit;
+		**644168 patients;
+
 *THE FINISHED PRODUCT*;
 
 data output.bph_cohort;
-set bph_genderexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate);
+set bph_genderexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate aprox_age);
 run;
 
 
@@ -355,13 +407,13 @@ proc sql;
 select count(distinct patid) as "Linked patients"n
 from output.linked_bph_cohort
 quit;
+		**604070 patients;
 
 ***********************************************;
 ************** EXPORTING PATIDS ***************;
 ***********************************************;
 
 
-*final count: 253 thousand patients;
 proc export data = output.linked_bph_cohort (keep = patid)
 outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
 dbms=csv

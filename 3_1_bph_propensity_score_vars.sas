@@ -31,7 +31,7 @@ proc sql;
 	create table indexdate as
 	select patid,
 		   min(issuedate) as index_date format = ddmmyy10.
-	from output.all_bph_episodes
+	from output.all_bph_episodes 
 	group by patid;
 quit;
 
@@ -40,12 +40,11 @@ proc sql;
 	create table output.bph_pp_propscor as
 	select b.*,
 		   i.index_date
-	from output.bph_cohort AS b
+	from output.linked_bph_cohort AS b 
 	left outer join indexdate as i 
 	on b.patid = i.patid
 	where index_date is not null;
 quit;
-
 
 %mend initialize_main_table;
 
@@ -56,7 +55,7 @@ quit;
         SELECT DISTINCT
             cli.patid, MIN(cli.obsdate) AS obsdate format=ddmmyy10.
         FROM 
-            output.clinical AS cli
+            output.clinical AS cli 
         INNER JOIN
             &codelist_table AS cl
             ON cli.medcodeid = cl.medcode
@@ -113,7 +112,7 @@ data disorders;
 	codelist.cancer, output.cancer_cohort, cancer
 	codelist.copd, output.copd_cohort, copd
 	codelist.stroke, output.stroke_cohort, stroke
-	codelist.rheumatological_disease, output.rheumatological_disease_cohort, rheumatological_disease
+	codelist.rheum_disease, output.rheum_cohort, rheum_disease
 	codelist.diabetes, output.diabetes_cohort, diabetes
 	codelist.heart_failure, output.heart_failure_cohort, heart_failure
 	codelist.hypercholesterolaemia, output.hypercholesterolaemia_cohort, hypercholesterolaemia

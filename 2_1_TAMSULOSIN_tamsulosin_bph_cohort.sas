@@ -45,7 +45,7 @@ proc sql;
 		   r.quantity,
 		   r.duration,
 		   r.prodcodeid,
-		   c.atc,
+		   c.atc
 	FROM &drugfile as r  
 inner join codelist.&var._codes as c on strip(c.prodcodeid) = strip(r.prodcodeid);
 quit;
@@ -359,7 +359,7 @@ quit;
 
 proc sql;
 create table &out as
-select r.*
+select r.*, f.indexdate
 from EarliestRxBph_Filtered as f
 left outer join output.Rx_bph_PostStart as r
 on f.patid = r.patid;
@@ -405,8 +405,9 @@ output.bphdrugatc_3
 output.bphdrugatc_4;
 run;
 
+/* For testing
 
-/* HOW MANY PATIENTS? 264,340 */
+* HOW MANY PATIENTS? 264,340 ;
 proc sql;
 select count(distinct patid) as "Final Product"n
 from output.all_bph_episodes
@@ -415,15 +416,12 @@ quit;
 
 * data subset test for shorter runtime;
 
-data output.lildrugissue;
+data output.drugissue_TEST;
 set rawdata.drugissue_2;
 where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
 run;
 
-data output.lilpatient;
-set rawdata.patient_2;
-where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
-run;
 
-%drugdata(in=output.lildrugissue, out=output.bphdrugatc_test)
+%drugdata(in=output.drugissue_TEST, out=output.bph_episodes_TEST);
 
+*/
