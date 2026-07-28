@@ -320,7 +320,12 @@ data output.smoking_all;
 set output.smoking_all_1 output.smoking_all_2 output.smoking_all_3 output.smoking_all_4;
 run;
 
-
+data output.smoking_all;
+set output.smoking_all;
+if smk_cur = 1 then smk_status = 1;
+else if smk_ex = 1 then smk_status = 2;
+else smk_status = 0;
+run;
 
 *TESTING*;
 

@@ -54,6 +54,10 @@ quit;
 %mend product;
 
 %product (var=tamsulosin, atccode = 'G04CA02', drugfile = &in); 
+%product (var=tamsulosin_poly1, atccode = 'G04CA52', drugfile = &in); 
+%product (var=tamsulosin_poly2, atccode = 'G04CA53', drugfile = &in); 
+%product (var=tamsulosin_poly3, atccode = 'G04CA54', drugfile = &in); 
+
 
 %product (var=finasteride_mono1, atccode = 'G04CB01', drugfile = &in); 
 %product (var=finasteride_mono2, atccode = 'D11AX10', drugfile = &in);
@@ -66,13 +70,16 @@ quit;
 *** append drugs records for all drugs and create numeric exposure variable;
 
 data appended_drugs;
-set output.tamsulosin_drugs (in = a) 
-output.alfuzosin_drugs (in=b) 
-output.finasteride_mono1_drugs (in=c)  
-output.finasteride_mono2_drugs (in=d);
-if a then exposure = 1;
-else if b then exposure = 2;
-else if c or d then exposure = 3;
+set output.tamsulosin_drugs (in = a)
+output.tamsulosin_poly1_drugs (in = b)
+output.tamsulosin_poly2_drugs (in = c) 
+output.tamsulosin_poly3_drugs (in = d)
+output.alfuzosin_drugs (in=e) 
+output.finasteride_mono1_drugs (in=f)  
+output.finasteride_mono2_drugs (in=g);
+if a or b or c or d then exposure = 1;
+else if e then exposure = 2;
+else if f or g then exposure = 3;
 run;
 
 
@@ -184,14 +191,13 @@ T.mg_value,
 BC.regstartdate,
 BC.baseline_dt
 	FROM bph_tam_cleaning AS T
-	INNER JOIN output.linked_bph_cohort AS BC ON BC.patid = T.patid
+	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
 ORDER BY T.assumed_duration, T.patid, T.issuedate; 
 quit;
 
 
 
 /* HOW MANY PATIENTS */
-/* losing about 30 thousand*/
 proc sql;
 select count(distinct patid) as "Step 3: bphtam join to base"n
 from bph_tam
@@ -216,7 +222,7 @@ quit;
 
 /* HOW MANY PATIENTS */
 proc sql;
-select count(distinct patid) as "Step 4: prevalent user #"n
+select count(distinct patid) as "prevalent user #"n
 from PrevalentUsers
 quit;
 
@@ -283,11 +289,7 @@ where p.issuedate = e.indexdate;
 quit;
 
 
-/*HOW MANY PATIENTS*/
-proc sql;
-select count(distinct patid) as "Step 5: First issue date"n
-from output.EarliestRxBphAll
-quit;
+
 
 *** excluding multi-drug initiators;
 
@@ -307,6 +309,11 @@ proc sql;
 	where patid not in (select patid from ExcludeMulti);
 quit;
 
+/*HOW MANY PATIENTS*/
+proc sql;
+select count(distinct patid) as "Step 5: multi-drug initiators"n
+from output.EarliestRxBphAll
+quit;
 
 /**************************************************************************/
 /* STEP 6: Exclude if run-in period is less than 365 days              */
@@ -321,7 +328,7 @@ quit;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as "Step 7: Washout exclusions"n
+select count(distinct patid) as "Step 6: Washout exclusions"n
 from EarliestRxBph_Filtered
 quit;
 
@@ -405,7 +412,45 @@ output.bphdrugatc_3
 output.bphdrugatc_4;
 run;
 
-/* For testing
+
+***********************************************;
+************** EXPORTING PATIDS ***************;
+***********************************************;
+
+proc sort data = output.all_bph_episodes;
+by patid;
+run;
+
+
+data unique_patients;
+set output.all_bph_episodes (keep = patid);
+by patid;
+if first.patid;
+run;
+
+
+proc sql;
+	create table hes_linkage_patients as
+	select a.patid 
+	from unique_patients as a 
+	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
+	where b.lsoa_e = 1 and b.hes_apc_e = 1;
+quit;
+
+
+proc sql;
+select count(distinct patid) as "Linked patients"n
+from hes_linkage_patients;
+quit;
+
+proc export data = hes_linkage_patients 
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_tamsulosin.csv"
+dbms=csv
+replace;
+run;
+
+
+/* For testing 
 
 * HOW MANY PATIENTS? 264,340 ;
 proc sql;

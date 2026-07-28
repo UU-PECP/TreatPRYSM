@@ -12,17 +12,17 @@ options(scipen = 999)
           #- NewFilePath. Where would you like to save the clean file? What would you like it to be called?
           #- choose either CPRD gold or CPRD Aurum, both found in F: folder
 
-      OriginalFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\alcohol_abuse.txt"
-      LinkedIds <- c("readcode" = "CleansedReadCode")
-      NewFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\alcohol.txt"
+      OriginalFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\1_InitialCodes\\cirrhosis.csv"
+      LinkedIds <- c("code" = "CleansedReadCode")
+      NewFilePath <- "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\2_CleanCodes\\cirrhosis.txt"
       Codebrowser <- read_delim("F:\\Research Information\\CPRD\\CPRD_CodeBrowser\\CPRD_CodeBrowser_Aurum\\CPRDAurumMedical.txt", delim = "\t")
       
     ### Stable Macro
-
-      OriginalFile <- read_delim(OriginalFilePath, delim = "\t")
-      #OriginalFile <- read.csv(OriginalFilePath)
-      
-      #OriginalFile <- OriginalFile %>% filter(str_detect(coding_system, "Read") == TRUE)
+    
+      #for txt
+      #OriginalFile <- read_delim(OriginalFilePath, delim = "\t")
+      #for csv
+      OriginalFile <- read.csv(OriginalFilePath)
       
       LinkedToAurum <- inner_join(OriginalFile, Codebrowser, by = LinkedIds, keep = TRUE, suffix = c(".og", ""))
       

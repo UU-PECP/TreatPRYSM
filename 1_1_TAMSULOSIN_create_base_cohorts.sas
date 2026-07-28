@@ -16,182 +16,6 @@ options fullstimer;
 
 
 
-*STEP 1: Define a base cohort by stringing together 4 patient files;
-	*  	The following columns were not found in the contributing tables: crd, deathdate, frd, tod;
-	* 	this is due to different variable names between CPRD Aurum and CPRD Gold;
-	*	Equivalents in Aurum are regstartdate, cprd_ddate, regenddate;
-proc sql;
-	CREATE TABLE base_cohort_1 AS
-	SELECT
-		patid,
-		gender,
-		yob,
-		regstartdate, 
-		cprd_ddate, 
-		regenddate,
-		pracid
-	FROM rawdata.patient_1; 
-quit;
-
-
-proc sql;
-	CREATE TABLE base_cohort_2 AS
-	SELECT
-		patid,
-		gender,
-		yob,
-		regstartdate, 
-		cprd_ddate, 
-		regenddate,
-		pracid
-	FROM rawdata.patient_2; 
-quit;
-
-proc sql;
-	CREATE TABLE base_cohort_3 AS
-	SELECT
-		patid,
-		gender,
-		yob,
-		regstartdate, 
-		cprd_ddate, 
-		regenddate,
-		pracid
-	FROM rawdata.patient_3; 
-quit;
-
-proc sql;
-	CREATE TABLE base_cohort_4 AS
-	SELECT
-		patid,
-		gender,
-		yob,
-		regstartdate, 
-		cprd_ddate, 
-		regenddate,
-		pracid
-	FROM rawdata.patient_4; 
-quit;
-
-
-data output.initial_cohort;
-set base_cohort_1
-	base_cohort_2
-	base_cohort_3
-	base_cohort_4;
-run;
-
-		** 921729 patients ;
-
-*STEP 2: Exclude patients from Wales and extract lcd; 
-/*Import practice records */
-
-proc sql;
-	CREATE TABLE practice_1 AS
-	SELECT
-		region,
-		lcd,
-		pracid
-	FROM rawdata.practice_1; 
-quit;
-
-
-proc sql;
-	CREATE TABLE practice_2 AS
-	SELECT
-		region,
-		lcd,
-		pracid
-	FROM rawdata.practice_2; 
-quit;
-
-proc sql;
-	CREATE TABLE practice_3 AS
-	SELECT
-		region,
-		lcd,
-		pracid
-	FROM rawdata.practice_3; 
-quit;
-
-proc sql;
-	CREATE TABLE practice_4 AS
-	SELECT
-		region,
-		lcd,
-		pracid
-	FROM rawdata.practice_4; 
-quit;
-
-
-
-data output.practice;
-set practice_1
-	practice_2
-	practice_3
-	practice_4;
-run;
-
-		** 1939 practices;
-
-data test3;
-set output.practice;
-where region = 10;
-run;
-
-
-proc sql;
-CREATE TABLE output.initial_cohort AS
-SELECT
-		coh.patid,
-		coh.gender,
-		coh.yob,
-		coh.regstartdate, 
-		coh.cprd_ddate, 
-		coh.regenddate,
-		coh.pracid,
-		pra.lcd
-FROM output.initial_cohort AS coh
-LEFT OUTER JOIN
-		output.practice AS pra
-		ON coh.pracid = pra.pracid
-        WHERE pra.region ne 10; /* no Welsh practices in data, this step is technically unnecessary */
-quit;
-
-
-*STEP 3: Create 1 event file out of 4 event files; 
-	*	selecting only certain variables
-	*	;
-
-Data clinical_1 ;
-Set rawdata.observation_1 (keep=patid obsdate medcodeid obstypeid);
-run;
-
-Data clinical_2 ;
-Set rawdata.observation_2 (keep=patid obsdate medcodeid obstypeid);
-run;
-
-Data clinical_3 ;
-Set rawdata.observation_3 (keep=patid obsdate medcodeid obstypeid);
-run;
-
-Data clinical_4 ;
-Set rawdata.observation_4 (keep=patid obsdate medcodeid obstypeid);
-run;
-
-
-data output.clinical;
-	set clinical_1
-	clinical_2
-	clinical_3
-	clinical_4;
-run;
-		** 1423855848 records; 
-
-proc datasets library = work kill nolist;
-run;
-quit;
-
 *Step 4: TEMPORARY find aSAH cases in clinical file;
 	* replace with HES data when available;
 proc sql;
@@ -335,12 +159,12 @@ data output.bph_cohort;
 	format censordate ddmmyy10.;
 	run;
 
-* STEP 9: Exclude patients under 18 years old at baseline (aprox_age > 17 retains adults), rare diseases (e.g. Loeys-Dietz, Marfan syndrome) , and non-males  *;
+* STEP 9: Exclude patients under 18 years old at baseline (reg_age > 17 retains adults), rare diseases (e.g. Loeys-Dietz, Marfan syndrome) , and non-males  *;
 
 data bph_ageexc;
 set output.bph_cohort;
-aprox_age = year(baseline_dt) - yob;
-if aprox_age >= 18;
+reg_age = year(baseline_dt) - yob;
+if reg_age >= 18;
 run;
 
 
@@ -382,40 +206,39 @@ from bph_genderexc;
 quit;
 		**644168 patients;
 
-*THE FINISHED PRODUCT*;
 
+
+
+
+
+
+* STEP 10: *THE FINISHED PRODUCT* and HES linkage;
 data output.bph_cohort;
-set bph_genderexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate aprox_age);
+set bph_genderexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate reg_age);
 run;
 
-
-*******************************************************************************
-
-**************************** HES APC DATA LINKAGE *****************************
-
-*******************************************************************************;
+data unique_patients;
+set output.bph_cohort (keep = patid);
+by patid;
+if first.patid;
+run;
 
 proc sql;
 	create table output.linked_bph_cohort as
 	select a.* 
-	from output.bph_cohort as a 
+	from unique_patients as a 
 	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
 	where b.lsoa_e = 1 and b.hes_apc_e = 1;
 quit;
 
+*** testing ***;
+
 proc sql;
-select count(distinct patid) as "Linked patients"n
-from output.linked_bph_cohort
+	select count(*) as total_rows,
+	count(distinct patid) as unique_patients
+	from output.linked_bph_cohort;
 quit;
-		**604070 patients;
 
-***********************************************;
-************** EXPORTING PATIDS ***************;
-***********************************************;
-
-
-proc export data = output.linked_bph_cohort (keep = patid)
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_BPH.csv"
-dbms=csv
-replace;
+proc freq data = output.linked_bph_cohort;
+	tables linkyear;
 run;
