@@ -1,0 +1,84 @@
+194  Proc sort data=test2;
+195  by patid;
+196  run;
+
+NOTE: There were 3992 observations read from the data set WORK.TEST2.
+NOTE: The data set WORK.TEST2 has 3992 observations and 8 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.03 seconds
+      memory              1820.34k
+      OS Memory           29960.00k
+      Timestamp           05/04/2026 03:41:54 PM
+      Step Count                        28  Switch Count  0
+
+
+197  Data test3;
+198  Set test2 ;
+199  by patid;
+200  if first.patid;
+201  run;
+
+NOTE: There were 3992 observations read from the data set WORK.TEST2.
+NOTE: The data set WORK.TEST3 has 3258 observations and 8 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      user cpu time       0.01 seconds
+      system cpu time     0.00 seconds
+      memory              702.68k
+      OS Memory           28668.00k
+      Timestamp           05/04/2026 03:42:33 PM
+      Step Count                        29  Switch Count  0
+
+
+202  Data COnsult1 ;
+203  Set Rawdata.Consultation_1 ;
+204  medcodeid2 = input (consmedcodeid, best20.);
+205  run;
+
+NOTE: There were 106431191 observations read from the data set RAWDATA.CONSULTATION_1.
+NOTE: The data set WORK.CONSULT1 has 106431191 observations and 10 variables.
+NOTE: DATA statement used (Total process time):
+      real time           1:15.24
+      user cpu time       12.59 seconds
+      system cpu time     10.95 seconds
+      memory              496.87k
+      OS Memory           35052.00k
+      Timestamp           05/04/2026 03:48:18 PM
+      Step Count                        30  Switch Count  0
+
+
+206  Proc sort data = COnsult1 ;
+207  by medcodeid2 ;
+208  run;
+
+NOTE: There were 106431191 observations read from the data set WORK.CONSULT1.
+NOTE: The data set WORK.CONSULT1 has 106431191 observations and 10 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           5:14.65
+      user cpu time       45.64 seconds
+      system cpu time     19.17 seconds
+      memory              1055160.87k
+      OS Memory           1083648.00k
+      Timestamp           05/04/2026 03:55:00 PM
+      Step Count                        31  Switch Count  0
+
+
+209  Data test4;
+210  merge COnsult1 (in=x ) BPH_codelist (in=y);
+211  by medcodeid2 ;
+212  if x and y ;
+213  run;
+
+NOTE: There were 106431191 observations read from the data set WORK.CONSULT1.
+NOTE: There were 15 observations read from the data set WORK.BPH_CODELIST.
+NOTE: The data set WORK.TEST4 has 0 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           1:01.61
+      user cpu time       11.18 seconds
+      system cpu time     4.25 seconds
+      memory              1122.59k
+      OS Memory           29436.00k
+      Timestamp           05/04/2026 03:56:40 PM
+      Step Count                        32  Switch Count  0

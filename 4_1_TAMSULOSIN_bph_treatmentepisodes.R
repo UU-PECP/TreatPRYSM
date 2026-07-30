@@ -105,7 +105,8 @@ pp_epi <- semi_join(pp_epi, linkedids, by = "patid")
 
 bph_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_pp_ps_bmismk.sas7bdat")
 bph_cohort <- bph_cohort %>% distinct(patid, .keep_all = TRUE) ## There are 763 petiants with 16 exact duplicates. The origin of this problem is probably in the create of linked_bph_cohort, but unsure.
-
+fu_vars <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_gp_dt, yob, baseline_dt))
+bph_cohort <- left_join(bph_cohort, fu_vars, by = "patid")
 
 bph_pp <- inner_join(pp_epi, bph_cohort, by = "patid")
 
@@ -128,13 +129,9 @@ bph_pp <- bph_pp %>%
 bph_filters <- bph_pp %>% 
   filter(episode.start > lubridate::ymd('2002-10-31')) %>% 
   filter(episode.start < end_of_fu)  %>%
-  mutate(fu_days = ymd(end_of_fu) - ymd(episode.start))
+  mutate(fu_days = ymd(end_of_fu) - ymd(episode.start)) 
+  
 
-test <- anti_join(bph_pp, bph_filters, by = "patid")
 
 
 write.csv(bph_filters, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_perprotocol.csv", row.names = FALSE)
-
-##############################################
-######## THIS IS ACTUALLY FILE 5_1 COPY PASTED FOR EASE OF RUNNING THE FILES AT THE SAME TIME!
-##############################################

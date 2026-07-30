@@ -1,0 +1,557 @@
+# SAS Script: CPRD Data Import
+
+## 1. Options and macro variables
+
+```sas
+options symbolgen mprint mlogic;
+
+%let prefix = RA_shahab_Extract_;
+%let suffix = ;
+```
+
+- `options symbolgen mprint mlogic`: Enables macro debugging (prints variable values, generated code, and logic flow to log).
+- `%let prefix = ...`: Defines a macro variable for the file name prefix.
+- `&datafolder.` is an external macro variable (assumed set earlier) pointing to the root data directory.
+
+---
+
+## 2. Patient data
+
+```sas
+data patient;
+	infile "&datafolder.\txt\&prefix.Patient_001.txt" dsd dlm='09'x firstobs=2 truncover;
+		input patid vmid gender yob mob marital famnum chsreg chsdate : ddmmyy10. prescr capsup 
+		  frd : ddmmyy10. crd : ddmmyy10. regstat reggap internal tod : ddmmyy10.  toreason deathdate : ddmmyy10.  accept;
+	format  frd ddmmyy10. crd ddmmyy10. chsdate ddmmyy10. tod ddmmyy10. deathdate ddmmyy10.;
+run;
+```
+
+Reads single file `Patient_001.txt` into dataset `patient`. Tab-delimited (`dlm='09'x`), skips header (`firstobs=2`). Date variables use `: ddmmyy10.` informat. `format` applies date formats for display.
+
+---
+
+## 3. Clinical data setup and import
+
+```sas
+%let max_clin = 2;
+
+data clinical;
+			  format patid best12. ;
+	          format eventdate $10. ;
+	          format sysdate ddmmyy10. ;
+	          format constype best12. ;
+	          format consid best12. ;
+	          format medcode best12. ;
+	          format staffid best12. ;
+	          format episode best12. ;
+	          format enttype best12. ;
+	          format adid best12. ;
+			  delete;
+run;
+
+%macro readclinical;
+%do i = 1 %to &max_clin.; 
+		%if &i. < 10 %then %do; 
+	data RAW_DATA.CLINICAL00&i.;
+	       %let _EFIERR_ = 0;
+	       infile "&datafolder.\txt\&prefix.Clinical_00&i..txt" delimiter='09'x MISSOVER DSD lrecl=32767 firstobs=2 ;
+	          informat patid best32. ;
+	          informat eventdate $10. ;
+	          informat sysdate ddmmyy10. ;
+	          informat constype best32. ;
+	          informat consid best32. ;
+	          informat medcode best32. ;
+	          informat staffid best32. ;
+	          informat episode best32. ;
+	          informat enttype best32. ;
+	          informat adid best32. ;
+	          format patid best12. ;
+	          format eventdate $10. ;
+	          format sysdate ddmmyy10. ;
+	          format constype best12. ;
+	          format consid best12. ;
+	          format medcode best12. ;
+	          format staffid best12. ;
+	          format episode best12. ;
+	          format enttype best12. ;
+	          format adid best12. ;
+	       input
+	                   patid
+	                   eventdate $
+	                   sysdate
+	                   constype
+	                   consid
+	                   medcode
+	                   staffid
+	                   episode
+	                   enttype
+	                   adid
+	       ;
+	if _ERROR_ then call symputx('_EFIERR_',1);
+	run;
+%end;
+proc append base=clinical data=RAW_DATA.CLINICAL00&i.;
+run;
+proc datasets library=raw_data;
+delete CLINICAL00&i.;
+quit;
+%end;
+%mend;
+
+%readclinical;
+```
+
+Creates empty `clinical` dataset with formats. Macro loops `i=1` to `&max_clin`, imports each numbered clinical file, and appends to base. Temporary datasets are deleted after append.
+
+---
+
+## 4. Additional data
+
+```sas
+%let max_add = 1;
+
+data additional;
+			format patid best12. ;
+       		format enttype best12. ;
+			format adid best12. ;
+         	format data1 $12. ;
+         	format data2 $12. ;
+         	format data3 $12. ;
+         	format data4 $12. ;
+         	format data5 $12. ;
+         	format data6 $12. ;
+         	format data7 $12. ;
+			delete;
+run;
+
+%macro readadditional;
+%do i = 1 %to &max_add.; 
+		%if &i. < 10 %then %do; 
+	data RAW_DATA.ADDITIONAL00&i.;
+	       %let _EFIERR_ = 0;
+	       infile "&datafolder.\txt\&prefix.Additional_00&i..txt" delimiter='09'x MISSOVER DSD lrecl=32767 firstobs=2 ;
+         informat patid best12. ;
+         informat enttype best12. ;
+         informat adid best12. ;
+         informat data1 $12. ;
+         informat data2 $12. ;
+         informat data3 $12. ;
+         informat data4 $12. ;
+         informat data5 $12. ;
+         informat data6 $12. ;
+         informat data7 $12. ;
+         format patid best12. ;
+         format enttype best12. ;
+         format adid best12. ;
+         format data1 $12. ;
+         format data2 $12. ;
+         format data3 $12. ;
+         format data4 $12. ;
+         format data5 $12. ;
+         format data6 $12. ;
+         format data7 $12. ;
+      input
+                  patid
+                  enttype
+                  adid
+                  data1 $
+                  data2 $
+                  data3 $
+                  data4 $
+                  data5 $
+                  data6 $
+                  data7 $
+      ;
+      if _ERROR_ then call symputx('_EFIERR_',1);
+      run;
+%end;
+proc append base=Additional data=RAW_DATA.Additional00&i.;
+run;
+proc datasets library=raw_data;
+delete Additional00&i.;
+quit;
+%end;
+%mend;
+
+%readadditional;
+```
+
+Creates empty `additional` dataset with seven free-text fields (`data1`–`data7`). Macro imports `Additional_001.txt` and appends. Similar structure to clinical but only one file.
+
+---
+
+## 5. Referral data
+
+```sas
+%let max_ref = 1;
+data referral;
+			format patid best12. ;
+         	format eventdate $10. ;
+         	format sysdate ddmmyy10. ;
+         	format constype best12. ;
+         	format consid best12. ;
+         	format medcode best12. ;
+         	format staffid best12. ;
+         	format source best12. ;
+         	format nhsspec best12. ;
+         	format fhsaspec best12. ;
+         	format inpatient best12. ;
+         	format attendance best12. ;
+         	format urgency best12. ;
+			delete;
+run;
+
+%macro readreferral;
+%do i = 1 %to &max_ref.; 
+		%if &i. < 10 %then %do;
+    data RAW_DATA.REFERRAL00&i    ;
+      	%let _EFIERR_ = 0;
+      	infile "&datafolder.\txt\&prefix.Referral_00&i..txt" delimiter='09'x MISSOVER DSD lrecl=32767 firstobs=2 ;
+         informat patid best32. ;
+         informat eventdate $10. ;
+         informat sysdate ddmmyy10. ;
+         informat constype best32. ;
+         informat consid best32. ;
+         informat medcode best32. ;
+         informat staffid best32. ;
+         informat source best32. ;
+         informat nhsspec best32. ;
+         informat fhsaspec best32. ;
+         informat inpatient best32. ;
+         informat attendance best32. ;
+         informat urgency best32. ;
+         format patid best12. ;
+         format eventdate $10. ;
+         format sysdate ddmmyy10. ;
+         format constype best12. ;
+         format consid best12. ;
+         format medcode best12. ;
+         format staffid best12. ;
+         format source best12. ;
+         format nhsspec best12. ;
+         format fhsaspec best12. ;
+         format inpatient best12. ;
+         format attendance best12. ;
+         format urgency best12. ;
+      input
+                  patid
+                  eventdate $
+                  sysdate
+                  constype
+                  consid
+                  medcode
+                  staffid
+                  source
+                  nhsspec
+                  fhsaspec
+                  inpatient
+                  attendance
+                  urgency
+      ;
+      if _ERROR_ then call symputx('_EFIERR_',1);
+      run;
+%end;
+proc append base=Referral data=RAW_DATA.Referral00&i.;
+run;
+proc datasets library=raw_data;
+delete Referral00&i.;
+quit;
+%end;
+%mend;
+
+%readreferral;
+```
+
+Creates empty `referral` dataset with referral-specific fields (specialty codes, inpatient flags). Macro imports `Referral_001.txt` and appends.
+
+---
+
+## 6. Test data
+
+```sas
+%let max_tst = 6;
+data test;
+		 format patid best12. ;
+         format eventdate $10. ;
+         format sysdate ddmmyy10. ;
+         format constype best12. ;
+         format consid best12. ;
+         format medcode best12. ;
+         format staffid best12. ;
+         format enttype best12. ;
+         format data1 best12. ;
+         format data2 best12. ;
+         format data3 best12. ;
+         format data4 best12. ;
+         format data5 best12. ;
+         format data6 best12. ;
+         format data7 best12. ;
+		 format data8 best12. ;
+   		 delete;
+run;
+
+%macro readtest;
+%do i = 1 %to &max_tst.; 
+		%if &i. < 10 %then %do;
+    data RAW_DATA.TEST00&i    ;
+      	%let _EFIERR_ = 0;
+      	infile "&datafolder.\txt\&prefix.Test_00&i..txt" delimiter='09'x MISSOVER DSD lrecl=32767 firstobs=2 ;
+         informat patid best32. ;
+         informat eventdate $10. ;
+         informat sysdate ddmmyy10. ;
+         informat constype best32. ;
+         informat consid best32. ;
+         informat medcode best32. ;
+         informat staffid best32. ;
+         informat enttype best32. ;
+         informat data1 best32. ;
+         informat data2 best32. ;
+         informat data3 best32. ;
+         informat data4 best32. ;
+         informat data5 best32. ;
+         informat data6 best32. ;
+         informat data7 best32. ;
+		 informat data8 best32. ;
+         format patid best12. ;
+         format eventdate $10. ;
+         format sysdate ddmmyy10. ;
+         format constype best12. ;
+         format consid best12. ;
+         format medcode best12. ;
+         format staffid best12. ;
+         format enttype best12. ;
+         format data1 best12. ;
+         format data2 best12. ;
+         format data3 best12. ;
+         format data4 best12. ;
+         format data5 best12. ;
+         format data6 best12. ;
+         format data7 best12. ;
+		 format data8 best12. ;
+      input
+                  patid
+                  eventdate $
+                  sysdate
+                  constype
+                  consid
+                  medcode
+                  staffid
+                  enttype
+                  data1
+                  data2
+                  data3
+                  data4
+                  data5
+                  data6
+                  data7
+				  data8
+      ;
+      if _ERROR_ then call symputx('_EFIERR_',1);
+      run;
+%end;
+proc append base=Test data=RAW_DATA.Test00&i.;
+run;
+proc datasets library=raw_data;
+delete Test00&i.;
+quit;
+%end;
+%mend;
+
+%readtest;
+```
+
+Creates empty `test` dataset with eight numeric result fields (`data1`–`data8`). Macro loops through 6 test files (Test_001.txt through Test_006.txt), imports each, and appends.
+
+---
+
+## 7. Therapy data
+
+```sas
+%let max_ther = 9;
+
+data therapy;
+		informat patid best32. ;
+		informat eventdate $10. ;
+		informat sysdate $10. ;
+		informat consid best32. ;
+		informat prodcode best32. ;
+		informat staffid best32. ;
+		informat dosageid $64. ;
+		informat bnfcode best32. ;
+		informat qty best32. ;
+		informat numdays best32. ;
+		informat numpacks best32. ;
+		informat packtype best32. ;
+		informat issueseq best32. ;
+		format patid best12. ;
+		format eventdate $10. ;
+		format sysdate $10. ;
+		format consid best12. ;
+		format prodcode best12. ;
+		format staffid best12. ;
+		format dosageid $64. ;
+		format bnfcode best12. ;
+		format qty best12. ;
+		format numdays best12. ;
+		format numpacks best12. ;
+		format packtype best12. ;
+		format issueseq best12. ;
+   		 delete;
+run;
+
+%macro readtherapy;
+%do i = 1 %to &max_ther.; 
+		%if &i. < 10 %then %do;
+    data RAW_DATA.THERAPY00&i    ;
+      	%let _EFIERR_ = 0;
+      	infile "&datafolder.\txt\&prefix.Therapy_00&i..txt" delimiter='09'x MISSOVER DSD lrecl=32767 firstobs=2 ;
+        	informat patid best32. ;
+			informat eventdate $10. ;
+			informat sysdate $10. ;
+			informat consid best32. ;
+			informat prodcode best32. ;
+			informat staffid best32. ;
+			informat dosageid $64. ;
+			informat bnfcode best32. ;
+			informat qty best32. ;
+			informat numdays best32. ;
+			informat numpacks best32. ;
+			informat packtype best32. ;
+			informat issueseq best32. ;
+			format patid best12. ;
+			format eventdate $10. ;
+			format sysdate $10. ;
+			format consid best12. ;
+			format prodcode best12. ;
+			format staffid best12. ;
+			format dosageid $64. ;
+			format bnfcode best12. ;
+			format qty best12. ;
+			format numdays best12. ;
+			format numpacks best12. ;
+			format packtype best12. ;
+			format issueseq best12. ;
+	input
+			patid
+			eventdate $
+			sysdate $
+			consid
+			prodcode
+			staffid
+			dosageid $
+			bnfcode
+			qty
+			numdays
+			numpacks
+			packtype
+			issueseq
+      ;
+      if _ERROR_ then call symputx('_EFIERR_',1);
+run;
+%end;
+proc append base=therapy data=RAW_DATA.Therapy00&i.;
+run;
+proc datasets library=raw_data;
+delete Therapy00&i.;
+quit;
+%end;
+%mend;
+
+%readtherapy;
+```
+
+Creates empty `therapy` dataset with prescription fields (product codes, quantity, days supplied). Macro loops through 9 therapy files (Therapy_001.txt through Therapy_009.txt), imports each, and appends. Note dates stored as strings (`$10.`), not SAS dates.
+
+---
+
+## 8. Practice data
+
+```sas
+Data raw_data.practice;
+ infile "&datafolder.\TXT\&prefix.Practice_001.txt" dsd dlm='09'x firstobs=2 truncover;
+ input pracid region lcd : ddmmyy10. uts : ddmmyy10.   ;
+ format lcd ddmmyy10. uts ddmmyy10. ;
+run;
+```
+
+Reads single file `Practice_001.txt` directly into permanent `raw_data.practice` dataset. Contains practice ID, region, and two dates (last collection date, up-to-standard date).
+
+---
+
+## 9. Final dataset moves and combinations
+
+```sas
+data raw_data.patient;
+set patient; 
+run;
+
+data raw_data.referral;
+set referral;
+run;
+
+data raw_data.clinical;
+set clinical;
+run;
+
+data raw_data.test;
+set test;
+run;
+
+data raw_data.additional;
+set additional;
+run;
+
+data raw_data.therapy;
+set therapy;
+run;
+
+Data clinical_all;
+Set raw_data.clinical raw_data.referral;
+run;
+
+Data raw_data.Clinical_all;
+set clinical_all;
+run;
+
+Data clinical_total;
+Set clinical_all raw_data.test;
+run;
+
+Data raw_data.Clinical_total;
+set clinical_total;
+run;
+```
+
+Moves all temporary datasets into permanent `raw_data` library. Then combines clinical and referral into `clinical_all`, and adds test data to create `clinical_total` (a unified clinical events dataset).
+
+---
+
+## 10. Contents checks
+
+```sas
+proc contents
+data =raw_data.clinical;
+run;
+
+proc contents
+data =raw_data.patient;
+run;
+
+proc contents
+data =raw_data.additional;
+run;
+
+proc contents
+data =raw_data.test;
+run;
+
+proc contents
+data =raw_data.therapy;
+run;
+
+proc contents
+data =raw_data.referral;
+run;
+```
+
+`proc contents` prints variable metadata (names, types, formats, labels) for each final dataset — a quick quality check to confirm imports worked correctly.

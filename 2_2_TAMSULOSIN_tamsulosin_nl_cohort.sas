@@ -5,7 +5,7 @@
 ** 	October 2025 - September 2026 				**
 **	Drug - Tamsulosin							**
 **												**
-**	File 2.1: Exposure Generation for BPH		**
+**	File 2.2: Exposure Generation for NL		**
 /************************************************/;
 
 /**************************************************************************/
@@ -19,14 +19,14 @@ libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists";
 options fullstimer; /* Display detailed resource usage info in log */
 
 
-************************************** BPH COHORT ****************************************;
+************************************** NEPHROLITHIASIS COHORT ****************************************;
 %macro drugdata(in =, out=);
 
 /**************************************************************************/
-/* STEP 1: Extract BPH drug records for the current drugissue file        */
+/* STEP 1: Extract NL drug records for the current drugissue file         */
 /**************************************************************************/
 
-*** Identify tamsulosin and comparator drug records;
+*** Identify tamsulosin and standard-of-care analgesic drug records;
 
 %macro product (var=, atccode =, drugfile =); 
 proc sql;
@@ -54,39 +54,36 @@ quit;
 
 %mend product;
 
+*** exposure of interest: tamsulosin (same codes as the BPH script);
+
 %product (var=tamsulosin, atccode = 'G04CA02', drugfile = &in); 
 %product (var=tamsulosin_poly1, atccode = 'G04CA52', drugfile = &in); 
 %product (var=tamsulosin_poly2, atccode = 'G04CA53', drugfile = &in); 
 %product (var=tamsulosin_poly3, atccode = 'G04CA54', drugfile = &in); 
 
+*** comparator: standard-of-care analgesics for acute stone management;
 
-%product (var=finasteride_mono1, atccode = 'G04CB01', drugfile = &in); 
-%product (var=finasteride_mono2, atccode = 'D11AX10', drugfile = &in);
-
-%product (var=alfuzosin, atccode = 'G04CA01', drugfile = &in);  
-
+%product (var=analgesic_nsaid, atccode = 'M01AE%', drugfile = &in); 
+%product (var=analgesic_other, atccode = 'N02%', drugfile = &in); 
 
 
-
-*** append drugs records for all drugs and create numeric exposure variable;
+*** append drug records for all drugs and create numeric exposure variable;
 
 data appended_drugs;
 set output.tamsulosin_drugs (in = a)
 output.tamsulosin_poly1_drugs (in = b)
 output.tamsulosin_poly2_drugs (in = c) 
 output.tamsulosin_poly3_drugs (in = d)
-output.alfuzosin_drugs (in=e) 
-output.finasteride_mono1_drugs (in=f)  
-output.finasteride_mono2_drugs (in=g);
-if a or b or c or d then exposure = 1;
-else if e then exposure = 2;
-else if f or g then exposure = 3;
+output.analgesic_nsaid_drugs (in = e) 
+output.analgesic_other_drugs (in = f);
+if a or b or c or d then exposure = 1;   /* tamsulosin */
+else if e or f then exposure = 2;        /* standard-of-care analgesics */
 run;
 
 
 *** find mg value ;
 
-data output.bph_drugs;
+data output.nl_drugs;
     set appended_drugs;  
     length unit_found $20;
 
@@ -108,8 +105,8 @@ run;
 
 /* HOW MANY PATIENTS */
 proc sql;
-select count(distinct patid) as "Step 1: bph drugs"n
-from output.bph_drugs;
+select count(distinct patid) as "Step 1: nl drugs"n
+from output.nl_drugs;
 quit;
 
 
@@ -123,32 +120,32 @@ proc sort data = codelist.common_dosages_aurum_dec2025;
 by dosageid;
 run;
 
-proc sort data = output.bph_drugs;
+proc sort data = output.nl_drugs;
 by dosageid;
 run;
 
-data bph_dosages;
-merge codelist.common_dosages_aurum_dec2025 (in=a) output.bph_drugs (in=b);
+data nl_dosages;
+merge codelist.common_dosages_aurum_dec2025 (in=a) output.nl_drugs (in=b);
 by dosageid;
 if b;
 run;
 
-proc univariate data=bph_dosages;
+proc univariate data=nl_dosages;
 	var daily_dose;
 run;
 
-proc univariate data=bph_dosages;
+proc univariate data=nl_dosages;
 	var quantity;
 run;
 
-proc univariate data=bph_dosages;
+proc univariate data=nl_dosages;
 	var duration;
 run;
 
-*** calculate means daily dose;
+*** calculate mean daily dose;
 
-data bph_dosages_mg;
-set bph_dosages;
+data nl_dosages_mg;
+set nl_dosages;
 if daily_dose > 0 then mean_daily_dose = mg_value*daily_dose;
 else mean_daily_dose = mg_value;
 run;
@@ -156,8 +153,8 @@ run;
 *** Algorithm to determine reasonable assumed duration per prescription;
 *** borrowed from ADEPT script with permission from Magdalena Gamba *;
 
-data bph_tam_cleaning;
-set bph_dosages_mg;
+data nl_tam_cleaning;
+set nl_dosages_mg;
 if daily_dose > 5 or daily_dose = . then daily_dose = 1;
 if daily_dose = 0 then daily_dose = 0.5;
 if quantity > 90 then quantity = 90;
@@ -166,10 +163,9 @@ if assumed_duration = . and duration ne . and duration > 0 and duration < 90 the
 if assumed_duration = . or assumed_duration < 1 then assumed_duration = 30;
 run; 
 
-proc univariate data=bph_tam_cleaning;
+proc univariate data=nl_tam_cleaning;
 	var assumed_duration;
 run;
-
 
 
 /****************************************************************************/
@@ -177,9 +173,10 @@ run;
 /****************************************************************************/
 
 *** Join cleaned prescription records with base cohort; 
+*** aSAH_gp_dt and gender carried through for the exposure-specific aSAH counts;
 
 PROC SQL;
-CREATE TABLE bph_tam AS
+CREATE TABLE nl_tam AS
 	SELECT T.patid, 
 T.issuedate,  
 T.exposure,
@@ -189,20 +186,20 @@ T.quantity,
 T.assumed_duration,
 T.prodcodeid,
 T.mg_value,
-T.mean_daily_dose,
+BC.gender,
 BC.regstartdate,
-BC.baseline_dt
-	FROM bph_tam_cleaning AS T
-	INNER JOIN output.bph_cohort AS BC ON BC.patid = T.patid
+BC.baseline_dt,
+BC.aSAH_gp_dt
+	FROM nl_tam_cleaning AS T
+	INNER JOIN output.nl_cohort AS BC ON BC.patid = T.patid
 ORDER BY T.assumed_duration, T.patid, T.issuedate; 
 quit;
 
 
-
 /* HOW MANY PATIENTS */
 proc sql;
-select count(distinct patid) as "Step 3: bphtam join to base"n
-from bph_tam;
+select count(distinct patid) as "Step 3: nltam join to base"n
+from nl_tam;
 quit;
 
 /**************************************************************************/
@@ -210,15 +207,15 @@ quit;
 /**************************************************************************/
 /* 'Prevalent users' are those who had a drug prescription 1 year before   */
 /* their baseline date. We identify them by comparing issue date with the  */
-/* bph_dt in base_cohort. */
-/* second step removes identified prevalent users from main dataset */
+/* baseline_dt in base_cohort.                                            */
+/* second step removes identified prevalent users from main dataset       */
 
 *** identify prevalent users;
 
 proc sql;
 	create table PrevalentUsers as
 	select distinct patid
-	from bph_tam
+	from nl_tam
 	where issuedate between intnx('year', baseline_dt, -1, 'same') and baseline_dt - 1;
 quit;
 
@@ -233,9 +230,9 @@ quit;
 ***  We only keep prescriptions dated on or after baseline.;
 
 proc sql;
-	create table output.Rx_bph_PostStart as
+	create table output.Rx_nl_PostStart as
 	select *
-	from bph_tam b
+	from nl_tam b
 	where not exists (
 		select 1
 		from PrevalentUsers p
@@ -248,33 +245,33 @@ quit;
 /* HOW MANY PATIENTS */
 proc sql;
 select count(distinct patid) as "Step 4: removing prevalent users"n
-from output.Rx_bph_PostStart;
+from output.Rx_nl_PostStart;
 quit;
 
 
 /**************************************************************************/
-/* STEP 5: Identify earliest prescription date for each patient and exclude multi-drug initiators         */
+/* STEP 5: Identify earliest prescription date for each patient           */
 /**************************************************************************/
-/* Finds the minimum (earliest) eventdate among the valid prescriptions.  */
+/* Finds the minimum (earliest) issuedate among the valid prescriptions.  */
+/* NOTE: no multi-drug initiator exclusion here - unlike BPH,             */
+/* co-prescribing analgesics alongside tamsulosin is expected in acute    */
+/* stone management, so it is not an ambiguity to exclude on.             */
 
 proc sql;
-	create table output.BphEarliestDate as
+	create table output.NlEarliestDate as
 	select patid,
 		   min(issuedate) as indexdate format = ddmmyy10.
-	from output.Rx_bph_PostStart
+	from output.Rx_nl_PostStart
 	group by patid;
 quit;
 
 
-/* 1) We only keep rows where issuedate = indexdate.               */
-/* 2) We call this 'EarliestRxAll'.                                       */
-/* the earliest Rx will be used for cleaning in the subsequent steps, but then all records will
-be rejoined in the final step for creation of treatment episodes */
-
-*** includes 2 multi-drug initiators;
+/* 1) We only keep rows where issuedate = indexdate.                      */
+/* 2) The earliest Rx is used for cleaning in the subsequent steps, but   */
+/*    all records are rejoined in the final step.                         */
 
 proc sql;
-	create table output.EarliestRxBphAll as
+	create table output.EarliestRxNlAll as
 	select p.patid,
 		   p.issuedate,
 		   p.assumed_duration,
@@ -283,189 +280,235 @@ proc sql;
 		   e.indexdate,
 		   p.regstartdate,
 		   p.exposure,
-		   p.atc
-	from output.BphEarliestDate as e
-		left join output.Rx_bph_PostStart as p 
+		   p.atc,
+		   p.gender,
+		   p.aSAH_gp_dt
+	from output.NlEarliestDate as e
+		left join output.Rx_nl_PostStart as p 
 		on p.patid = e.patid
 where p.issuedate = e.indexdate;
 quit;
 
 
+*** tie-break: if a patient has both tamsulosin and an analgesic on the index ;
+*** date, assign tamsulosin as the index exposure so each patient contributes ;
+*** exactly one exposure to the aSAH counts                                   ;
 
+proc sort data = output.EarliestRxNlAll;
+by patid exposure;
+run;
 
-*** excluding multi-drug initiators;
-
-proc sql;
-	create table ExcludeMulti as
-	select patid
-	from output.EarliestRxBphAll
-	group by patid
-	having count(distinct exposure) > 1  /* More than 1 unique exposure => Exclude */
-	;
-quit;
-
-proc sql;
-	create table EarliestRxBph_Filtered as
-	select *
-	from output.EarliestRxBphAll
-	where patid not in (select patid from ExcludeMulti);
-quit;
+data EarliestRxNl_Filtered;
+set output.EarliestRxNlAll;
+by patid;
+if first.patid;
+run;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as "Step 5: multi-drug initiators"n
-from ExcludeMulti;
+select count(distinct patid) as "Step 5: one index exposure per patient"n
+from EarliestRxNl_Filtered;
 quit;
 
+
 /**************************************************************************/
-/* STEP 6: Exclude if run-in period is less than 365 days              */
+/* STEP 6: Exclude if run-in period is less than 365 days                 */
 /**************************************************************************/
 
 PROC SQL;
-create table EarliestRxBph_Filtered AS
+create table EarliestRxNl_Filtered AS
 select * 
-from EarliestRxBph_Filtered
+from EarliestRxNl_Filtered
 having indexdate - regstartdate > 365;
 quit;
 
 /*HOW MANY PATIENTS*/
 proc sql;
 select count(distinct patid) as "Step 6: Washout exclusions"n
-from EarliestRxBph_Filtered;
+from EarliestRxNl_Filtered;
 quit;
+
+
+/**************************************************************************/
+/* STEP 7: Restrict to prescriptions relevant to the stone episode        */
+/* (index Rx within 30 days on or after the NL baseline date)             */
+/**************************************************************************/
+/* NL-specific step, retained from the earlier NL pipeline - tamsulosin   */
+/* and analgesics are used for acute stone passage, so an index Rx long   */
+/* after diagnosis is unlikely to relate to that episode.                 */
+
+PROC SQL;
+create table EarliestRxNl_Filtered AS
+select *
+from EarliestRxNl_Filtered
+where indexdate - baseline_dt <= 30
+  and indexdate >= baseline_dt;
+quit;
+
+/*HOW MANY PATIENTS*/
+proc sql;
+select count(distinct patid) as "Step 7: Rx relevant to stone episode"n
+from EarliestRxNl_Filtered;
+quit;
+
 
 **********;
 /*
 /**************************************************************************/
-/* STEP 7: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx   */
-/* (COMMENTED OUT until HES APC linkage is incorporated )                      */
+/* STEP 8: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx   */
+/* (COMMENTED OUT until HES APC linkage is incorporated )                 */
 /**************************************************************************/
-/* If a patient's first aSAH date (HOSP ONLY) is before earliest Rx, we drop them.    */
-/* NOTE: DO NOT RUN UNTIL HES APC LINKAGE */
-/* NOTE: Jos's version requires both hospital and gp data so I have written new script myself for the timebeing*/
 
 *proc sql;
-*CREATE TABLE EarliestRxBph_Filtered AS
-SELECT d1.* , d2.patid, d2.aSAH_gp_dt
-FROM EarliestRxBph_Filtered as d1
-INNER JOIN output.linked_bph_cohort as d2 
+*CREATE TABLE EarliestRxNl_Filtered AS
+SELECT d1.* 
+FROM EarliestRxNl_Filtered as d1
+INNER JOIN output.linked_nl_cohort as d2 
 ON d1.patid = d2.patid
-	WHERE d2.aSAH_gp_dt > indexdate or d2.aSAH_gp_dt is NULL;
+	WHERE d1.aSAH_gp_dt > indexdate or d1.aSAH_gp_dt is NULL;
 *quit;
 
 /*HOW MANY PATIENTS*/
 *proc sql;
 *select count(distinct patid) as "Step 8: prior aSAH"n
-from EarliestRxBph_Filtered 
+from EarliestRxNl_Filtered 
 quit;
 
 
 /**************************************************************************/
-/* STEP 8: Retrieiving all treatment episodes from patients with exclusion criteria specified in steps 5 & 6   */
+/* STEP 9: Retrieving all treatment episodes from patients meeting the    */
+/* exclusion criteria specified in steps 5-7                              */
 /**************************************************************************/
 
 /* FINAL PRODUCT */
 
-proc sql; 
-create table EarliestRxBph_Index as
-select distinct patid, indexdate
-from EarliestRxBph_Filtered;
-quit;
-
 proc sql;
 create table &out as
-select r.*, f.indexdate
-from EarliestRxBph_Index as f
-left outer join output.Rx_bph_PostStart as r
+select r.*, f.indexdate, f.exposure as index_exposure
+from EarliestRxNl_Filtered as f
+left outer join output.Rx_nl_PostStart as r
 on f.patid = r.patid;
 quit;
 
 %mend;
 
 /**************************************************************************/
-/* STEP 9: Combine all four drugissue files                              */
+/* STEP 10: Combine all four drugissue files                              */
 /**************************************************************************/
 
 * real data input;
 
-%drugdata(in=rawdata.drugissue_1, out=output.bphdrugatc_1)
+%drugdata(in=rawdata.drugissue_1, out=output.nldrugatc_1)
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_2, out= output.bphdrugatc_2)
+%drugdata(in=rawdata.drugissue_2, out= output.nldrugatc_2)
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_3, out= output.bphdrugatc_3)
+%drugdata(in=rawdata.drugissue_3, out= output.nldrugatc_3)
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_4, out= output.bphdrugatc_4)
+%drugdata(in=rawdata.drugissue_4, out= output.nldrugatc_4)
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
 
-data output.all_bph_episodes;
-set output.bphdrugatc_1
-output.bphdrugatc_2
-output.bphdrugatc_3
-output.bphdrugatc_4;
+data output.all_nl_episodes;
+set output.nldrugatc_1
+output.nldrugatc_2
+output.nldrugatc_3
+output.nldrugatc_4;
 run;
+
+/* HOW MANY PATIENTS */
+proc sql;
+select count(distinct patid) as "Final Product"n
+from output.all_nl_episodes;
+quit;
 
 
 ***********************************************;
 ************** EXPORTING PATIDS ***************;
 ***********************************************;
 
-proc sort data = output.all_bph_episodes;
+proc sort data = output.all_nl_episodes;
 by patid;
 run;
 
-
 data unique_patients;
-set output.all_bph_episodes (keep = patid);
+set output.all_nl_episodes (keep = patid);
 by patid;
 if first.patid;
 run;
 
-
 proc sql;
-	create table hes_linkage_patients as
+	create table hes_linkage_patients_nl as
 	select a.patid 
 	from unique_patients as a 
 	inner join rawdata.aurum_eligibility_jan2026 as b on a.patid = b.patid
 	where b.lsoa_e = 1 and b.hes_apc_e = 1;
 quit;
 
-
 proc sql;
 select count(distinct patid) as "Linked patients"n
-from hes_linkage_patients;
+from hes_linkage_patients_nl;
 quit;
 
-proc export data = hes_linkage_patients 
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_tamsulosin.csv"
+proc export data = hes_linkage_patients_nl 
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_tamsulosin_nl.csv"
 dbms=csv
 replace;
 run;
 
 
+***********************************************;
+******** aSAH CASES BY INDEX EXPOSURE *********;
+***********************************************;
+
+*** one row per patient, using the index exposure assigned in Step 5;
+
+proc sort data = output.all_nl_episodes;
+by patid;
+run;
+
+data nl_patients_unique;
+set output.all_nl_episodes;
+by patid;
+if first.patid;
+if aSAH_gp_dt = . then aSAH = 0;
+else aSAH = 1;
+run;
+
+proc format;
+value expfmt 1 = "Tamsulosin"
+             2 = "Standard-of-care analgesics";
+run;
+
+title "aSAH cases by index exposure - nephrolithiasis cohort";
+proc freq data = nl_patients_unique;
+tables index_exposure * aSAH / nocol nopercent;
+format index_exposure expfmt.;
+run;
+
+title "aSAH cases by index exposure and sex - nephrolithiasis cohort";
+proc freq data = nl_patients_unique;
+tables index_exposure * gender * aSAH / nocol nopercent;
+format index_exposure expfmt.;
+run;
+title;
+
+
 /* For testing 
-
-* HOW MANY PATIENTS? 264,340 ;
-proc sql;
-select count(distinct patid) as "Final Product"n
-from output.all_bph_episodes
-quit;
-
 
 * data subset test for shorter runtime;
 
@@ -474,7 +517,6 @@ set rawdata.drugissue_2;
 where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
 run;
 
-
-%drugdata(in=output.drugissue_TEST, out=output.bph_episodes_TEST);
+%drugdata(in=output.drugissue_TEST, out=output.nl_episodes_TEST);
 
 */
