@@ -186,6 +186,7 @@ T.quantity,
 T.assumed_duration,
 T.prodcodeid,
 T.mg_value,
+T.mean_daily_dose,
 BC.gender,
 BC.regstartdate,
 BC.baseline_dt,
@@ -316,16 +317,16 @@ quit;
 /**************************************************************************/
 
 PROC SQL;
-create table EarliestRxNl_Filtered AS
+create table EarliestRxNl_washout AS
 select * 
 from EarliestRxNl_Filtered
-having indexdate - regstartdate > 365;
+where indexdate - regstartdate > 365;
 quit;
 
 /*HOW MANY PATIENTS*/
 proc sql;
 select count(distinct patid) as "Step 6: Washout exclusions"n
-from EarliestRxNl_Filtered;
+from EarliestRxNl_washout;
 quit;
 
 
@@ -338,17 +339,17 @@ quit;
 /* after diagnosis is unlikely to relate to that episode.                 */
 
 PROC SQL;
-create table EarliestRxNl_Filtered AS
+create table EarliestRxNl_episode AS
 select *
-from EarliestRxNl_Filtered
+from EarliestRxNl_washout
 where indexdate - baseline_dt <= 30
   and indexdate >= baseline_dt;
 quit;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as "Step 7: Rx relevant to stone episode"n
-from EarliestRxNl_Filtered;
+select count(distinct patid) as "Step 7: relevant Rx"n
+from EarliestRxNl_episode;
 quit;
 
 
@@ -382,10 +383,20 @@ quit;
 
 /* FINAL PRODUCT */
 
+*** collapse to one row per patient before the final join, so the join cannot   ;
+*** fan out. Step 5 first.patid tie-break already guarantees this, so this is  ;
+*** a no-op safeguard mirroring the equivalent fix in File 2_1.                  ;
+
+proc sql;
+create table EarliestRxNl_index as
+select distinct patid, indexdate, exposure as index_exposure
+from EarliestRxNl_episode;
+quit;
+
 proc sql;
 create table &out as
-select r.*, f.indexdate, f.exposure as index_exposure
-from EarliestRxNl_Filtered as f
+select r.*, f.indexdate, f.index_exposure
+from EarliestRxNl_index as f
 left outer join output.Rx_nl_PostStart as r
 on f.patid = r.patid;
 quit;
@@ -398,7 +409,7 @@ quit;
 
 * real data input;
 
-%drugdata(in=rawdata.drugissue_1, out=output.nldrugatc_1)
+%drugdata(in=rawdata.drugissue_1, out=output.nldrugatc_1);
 
 proc datasets library = work kill nolist;
 run;
@@ -505,18 +516,4 @@ proc freq data = nl_patients_unique;
 tables index_exposure * gender * aSAH / nocol nopercent;
 format index_exposure expfmt.;
 run;
-title;
 
-
-/* For testing 
-
-* data subset test for shorter runtime;
-
-data output.drugissue_TEST;
-set rawdata.drugissue_2;
-where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
-run;
-
-%drugdata(in=output.drugissue_TEST, out=output.nl_episodes_TEST);
-
-*/

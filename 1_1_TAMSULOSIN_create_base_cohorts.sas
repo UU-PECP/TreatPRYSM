@@ -213,8 +213,15 @@ quit;
 
 
 * STEP 10: *THE FINISHED PRODUCT* and HES linkage;
+
+proc sort data = bph_genderexc;
+by patid;
+run;
+
 data output.bph_cohort;
 set bph_genderexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate reg_age);
+by patid;
+if first.patid;
 run;
 
 data unique_patients;

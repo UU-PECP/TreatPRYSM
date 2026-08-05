@@ -159,21 +159,29 @@ tables gender;
 run;
 
 
-* STEP 10: *THE FINISHED PRODUCT* and HES linkage;
+* STEP 10: *THE FINISHED PRODUCT* deduplication and HES linkage;
+
+proc sort data = nl_rarediseaseexc;
+by patid;
+run;
 
 data output.nl_cohort;
 set nl_rarediseaseexc (keep = patid gender yob regstartdate nl_dt aSAH_gp_dt baseline_dt censordate reg_age);
+by patid;
+if first.patid;
 run;
 
 proc sort data = output.nl_cohort;
 by patid;
 run;
 
-data unique_patients;
+data unique_patients; /* Why 297942 rows in dataset but 297039 unique patients*/
 set output.nl_cohort (keep = patid);
 by patid;
 if first.patid;
 run;
+
+
 
 proc sql;
 	create table output.linked_nl_cohort as

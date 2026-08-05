@@ -84,6 +84,10 @@ else if f or g then exposure = 3;
 run;
 
 
+proc sort data = appended_drugs;
+by patid;
+run;
+
 *** find mg value ;
 
 data output.bph_drugs;
@@ -111,7 +115,7 @@ proc sql;
 select count(distinct patid) as "Step 1: bph drugs"n
 from output.bph_drugs;
 quit;
-
+* Write how many patients for each file *;
 
 /****************************************************************************/
 /* STEP 2: Generate treatment duration and mean daily dose in mg from common dosages file.*/
@@ -143,14 +147,6 @@ run;
 
 proc univariate data=bph_dosages;
 	var duration;
-run;
-
-*** calculate means daily dose;
-
-data bph_dosages_mg;
-set bph_dosages;
-if daily_dose > 0 then mean_daily_dose = mg_value*daily_dose;
-else mean_daily_dose = mg_value;
 run;
 
 *** Algorithm to determine reasonable assumed duration per prescription;

@@ -99,10 +99,6 @@ pp_epi <- treat_epi_all %>% group_by(patid) %>%
                              ungroup() %>% mutate(patid = as.character(patid))
 
 ### Combine treatment episode info with base cohort
-linkedids <- read.csv("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Codelists\\LinkedPatients_tamsulosin.csv",
-                      colClasses = c(patid = "character")) 
-pp_epi <- semi_join(pp_epi, linkedids, by = "patid")
-
 bph_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_pp_ps_bmismk.sas7bdat")
 bph_cohort <- bph_cohort %>% distinct(patid, .keep_all = TRUE) ## There are 763 petiants with 16 exact duplicates. The origin of this problem is probably in the create of linked_bph_cohort, but unsure.
 fu_vars <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_gp_dt, yob, baseline_dt))
@@ -123,9 +119,10 @@ bph_pp <- bph_pp %>%
     !is.na(aSAH_gp_dt) & aSAH_gp_dt < end_of_fu & aSAH_gp_dt > lubridate::ymd('2002-10-31') ~ aSAH_gp_dt,
     lubridate::ymd('2025-03-31') < end_of_fu ~ lubridate::ymd('2025-03-31')
   )) %>% 
-  mutate(aSAH = if_else(!is.na(aSAH_gp_dt) & aSAH_gp_dt <= end_of_fu, 1, 0)) %>% 
-  mutate(fu_days = end_of_fu - baseline_dt + 1)
+  mutate(aSAH = if_else(!is.na(aSAH_gp_dt) & aSAH_gp_dt <= end_of_fu, 1, 0))
 
+
+### Censor here, don't exclude
 bph_filters <- bph_pp %>% 
   filter(episode.start > lubridate::ymd('2002-10-31')) %>% 
   filter(episode.start < end_of_fu)  %>%
