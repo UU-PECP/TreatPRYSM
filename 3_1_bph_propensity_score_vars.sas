@@ -117,7 +117,7 @@ data disorders;
 	codelist.heart_failure, output.heart_failure_cohort, heart_failure
 	codelist.hypercholesterolaemia, output.hypercholesterolaemia_cohort, hypercholesterolaemia
 	codelist.hypertension, output.hypertension_cohort, hypertension
-	codelist.liver_failure, output.liver_failure_cohort, liver_failure
+	codelist.cirrhosis, output.cirrhosis_cohort, cirrhosis
 	codelist.nephrolithiasis, output.nephrolith_cohort, nephrolith
 	codelist.paralysis, output.paralysis_cohort, paralysis
 	codelist.peptic_ulcer, output.peptic_ulcer_cohort, peptic_ulcer

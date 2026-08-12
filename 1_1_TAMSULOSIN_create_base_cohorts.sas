@@ -147,7 +147,7 @@ data output.bph_cohort;
 
 	*Define baseline dt as the later of registration start date or bph_dt, floored at study start (31OCT2002);
 	informat baseline_dt DDMMYY10.;
-	baseline_dt = max(of regstartdate bph_dt);
+	baseline_dt = max(of regstartdate bph_dt); 
 	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
 	format baseline_dt DDMMYY10.;
 	run;

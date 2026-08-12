@@ -70,58 +70,35 @@ set base_cohort_1
 	base_cohort_4;
 run;
 
-		** 921729 patients ;
+		** 918886 patients ;
+
+proc sql;
+select count(distinct patid) as "Total extracted patients"n
+from output.initial_cohort;
+quit;
 
 *STEP 2: Exclude patients from Wales and extract lcd; 
 /*Import practice records */
 
-proc sql;
-	CREATE TABLE practice_1 AS
-	SELECT
-		region,
-		lcd,
-		pracid
-	FROM rawdata.practice_1; 
-quit;
-
-
-proc sql;
-	CREATE TABLE practice_2 AS
-	SELECT
-		region,
-		lcd,
-		pracid
-	FROM rawdata.practice_2; 
-quit;
-
-proc sql;
-	CREATE TABLE practice_3 AS
-	SELECT
-		region,
-		lcd,
-		pracid
-	FROM rawdata.practice_3; 
-quit;
-
-proc sql;
-	CREATE TABLE practice_4 AS
-	SELECT
-		region,
-		lcd,
-		pracid
-	FROM rawdata.practice_4; 
-quit;
-
 
 
 data output.practice;
-set practice_1
-	practice_2
-	practice_3
-	practice_4;
+set rawdata.practice_1
+	rawdata.practice_2
+	rawdata.practice_3
+	rawdata.practice_4;
 run;
 
-		** 1939 practices;
+proc sort data = output.practice nodupkey;
+by pracid;
+run;
+
+proc sql;
+select count(distinct pracid) as "Total practices"n
+from output.practice;
+quit;
+
+		** 1936 practices;
 
 data test3;
 set output.practice;
@@ -181,5 +158,9 @@ proc datasets library = work kill nolist;
 run;
 quit;
 
-
+proc sql;
+create table unique_codes as 
+select distinct medcodeid
+from output.clinical;
+quit;
 

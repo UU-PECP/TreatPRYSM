@@ -199,7 +199,7 @@ quit;
 /**************************************************************************/
 proc sort data = output.IntervalCoverage_OT; by patid; run;
 
-data output.Intervals_RecencyOT;
+data &out;
 	merge output.IntervalCoverage_OT(in=inI)
 	      output.OverallFollowup_OnT(in=inO
 			keep = patid index_exposure index_date end_of_fu aSAH_gp_dt);
@@ -233,21 +233,6 @@ data output.Intervals_RecencyOT;
 	format index_date end_of_fu interval_window_start interval_window_end aSAH_gp_dt date9.;
 run;
 
-
-/**************************************************************************/
-/* STEP 22.4: Attach current-interval dose                                 */
-/**************************************************************************/
-proc sql;
-	create table &out as
-	select r.*,
-		   case when r.treatment_recency_status = 'Current'
-		        then d.mg_value_current
-		        else . end as mg_value_current
-	from output.Intervals_RecencyOT r
-		 left join output.IntervalDose d
-		   on r.patid = d.patid
-		  and r.interval_window_start = d.interval_window_start;
-quit;
 
 
 /**************************************************************************/

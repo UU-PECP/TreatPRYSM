@@ -119,13 +119,7 @@ bph_pp <- bph_pp %>%
     !is.na(aSAH_gp_dt) & aSAH_gp_dt < end_of_fu & aSAH_gp_dt > lubridate::ymd('2002-10-31') ~ aSAH_gp_dt,
     lubridate::ymd('2025-03-31') < end_of_fu ~ lubridate::ymd('2025-03-31')
   )) %>% 
-  mutate(aSAH = if_else(!is.na(aSAH_gp_dt) & aSAH_gp_dt <= end_of_fu, 1, 0))
-
-
-### Censor here, don't exclude
-bph_filters <- bph_pp %>% 
-  filter(episode.start > lubridate::ymd('2002-10-31')) %>% 
-  filter(episode.start < end_of_fu)  %>%
+  mutate(aSAH = if_else(!is.na(aSAH_gp_dt) & aSAH_gp_dt <= end_of_fu, 1, 0))%>%
   mutate(fu_days = ymd(end_of_fu) - ymd(episode.start)) 
   
 
