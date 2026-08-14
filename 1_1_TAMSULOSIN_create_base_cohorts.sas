@@ -35,23 +35,19 @@ quit;
 
 *Build rare disease codelist once, used by both BPH and NL cohorts below;
 
+
 data RareDisease_cod;
 	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
-	length medcodeid 8 ;
-	input medcodeid :19. ;
+	length medcodeid $19 ;
+	input medcodeid :$19. ;
 run;
 
-proc sql;
-create table RareDisease_char as 
-select put(medcodeid, 19.) as newmedcodeid
-from RareDisease_cod;
-quit;
 
 proc sql;
 	CREATE TABLE output.rarediseasecases AS
 	SELECT r.*
 	FROM output.clinical as r
-	inner join RareDisease_char as c on strip(c.newmedcodeid) = strip(r.medcodeid);
+	inner join RareDisease_cod as c on strip(c.medcodeid) = strip(r.medcodeid);
 quit;
 
 *** TESTING ***;
@@ -245,7 +241,4 @@ proc sql;
 	count(distinct patid) as unique_patients
 	from output.linked_bph_cohort;
 quit;
-
-proc freq data = output.linked_bph_cohort;
-	tables linkyear;
-run;
+	* 603842 patients;

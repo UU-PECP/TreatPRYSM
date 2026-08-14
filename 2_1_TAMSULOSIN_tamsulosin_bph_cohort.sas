@@ -206,8 +206,6 @@ by patid;
 if first.patid ;
 run;
 
-
-
 /* HOW MANY PATIENTS */
 proc sql;
 select count(distinct patid) as "Step 4: removing prevalent users"n
@@ -268,7 +266,7 @@ by patid;
 if exposure = 1 then expox = 10; 
 	else if exposure = 2 or 3 then expox = 1 ;
 if first.patid then sum_expo = 0 ;
-sum_expo = sum_exposure + expox ;
+sum_expo = sum_expo + expox ;
 retain sum_expo ;
 run;
 
@@ -282,7 +280,7 @@ Data New_users9 ;
 Set New_users8 ;
 by patid;
 if first.patid;
-Drop baseline_dt expox sum_exposure ;
+Drop baseline_dt expox sum_expo ;
 run;
 * 4155 patients used tamsulosin together with alfuzosin/ finasteride at index date and to be deleted, Set 1 only ;
 
@@ -477,11 +475,11 @@ from hes_linkage_patients;
 quit;
 
 proc export data = hes_linkage_patients 
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Export\LinkedPatients_tamsulosin.csv"
-dbms=csv
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Export\LinkedPatients_tamsulosin.txt"
+dbms=tab
 replace;
 run;
-* Patient Count TOTAL 245,585*;
+* Patient Count TOTAL 312,957*;
 
 /* The following can be used for testing 
 
