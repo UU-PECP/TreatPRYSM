@@ -55,7 +55,7 @@ proc sql;
 quit;
 
 *** TESTING ***;
-
+/*
 data output.initial_cohort_TEST;
 set rawdata.patient_2;
 where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
@@ -65,7 +65,7 @@ data output.clinical_TEST;
 set rawdata.observation_2;
 where input(patid, 19.) > 2000000000 and input(patid, 19.) < 3000000000;
 run;
-
+*/
 *******************************************************************************
 
 **************************** BPH COHORT GENERATION ****************************
@@ -138,7 +138,7 @@ proc SQL;
 SELECT COUNT(*) FROM output.bph_cohort
 WHERE aSAH_gp_dt IS NOT NULL;
 quit;
-		** 3206 aSAH cases in this cohort;
+		** 3433 aSAH cases in this cohort;
 
 * STEP 8: Define baseline date and censor date *;
 
@@ -147,7 +147,7 @@ data output.bph_cohort;
 
 	*Define baseline dt as the later of registration start date or bph_dt, floored at study start (31OCT2002);
 	informat baseline_dt DDMMYY10.;
-	baseline_dt = max(of regstartdate bph_dt); 
+	baseline_dt = regstartdate; 
 	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
 	format baseline_dt DDMMYY10.;
 	run;
@@ -173,7 +173,7 @@ proc sql;
 select count(distinct patid) as "Step 9: no kids"n
 from bph_ageexc;
 quit;
-		**644587 patients;
+		**644348 patients;
 
 
 proc sql;
@@ -192,7 +192,7 @@ proc sql;
 select count(distinct patid) as "Step 9: no rare disease"n
 from bph_rarediseaseexc;
 quit;
-		**644370 patients;
+		**644131 patients;
 
 data bph_genderexc;
 set bph_rarediseaseexc;
@@ -204,7 +204,7 @@ proc sql;
 select count(distinct patid) as "Step 9: males only"n
 from bph_genderexc;
 quit;
-		**644168 patients;
+		**643930 patients;
 
 
 

@@ -101,7 +101,7 @@ pp_epi <- treat_epi_all %>% group_by(patid) %>%
 ### Combine treatment episode info with base cohort
 bph_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_pp_ps_bmismk.sas7bdat")
 bph_cohort <- bph_cohort %>% distinct(patid, .keep_all = TRUE) ## There are 763 petiants with 16 exact duplicates. The origin of this problem is probably in the create of linked_bph_cohort, but unsure.
-fu_vars <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_gp_dt, yob, baseline_dt))
+fu_vars <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_gp_dt, yob))
 bph_cohort <- left_join(bph_cohort, fu_vars, by = "patid")
 
 bph_pp <- inner_join(pp_epi, bph_cohort, by = "patid")

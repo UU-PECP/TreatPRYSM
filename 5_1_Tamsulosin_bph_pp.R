@@ -89,8 +89,8 @@ save_as_docx(ft, path = "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\D
 run_ps_match_pipeline <- function(df, m = 5, seed = 123, replace = TRUE, caliper = 0.2, std.caliper = TRUE) {
   
   pred_matrix <- make.predictorMatrix(df)
-  pred_matrix[, ] <- 0
-  pred_matrix[, c(vars_cat, "age_at_index")] <- 1
+  pred_matrix[, !( dimnames(pred_matrix)[[2]]  %in%  c(vars_cat, "age_at_index") )] <- 0
+  #pred_matrix[, c(vars_cat, "age_at_index")] <- 1
   
   imputed <- mice(df, m = m, method = 'pmm', seed = seed, predictorMatrix = pred_matrix)
   comp_list <- complete(imputed, "all")
@@ -102,7 +102,7 @@ run_ps_match_pipeline <- function(df, m = 5, seed = 123, replace = TRUE, caliper
     antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
     solifenacin + tadalafil + bmi_value + smk_status
  
-   matched <- matchthem(ps_formula,
+   matched_list <- matchthem(ps_formula,
                        datasets    = imputed,
                        approach    = "within",
                        method      = "nearest",
@@ -114,11 +114,12 @@ run_ps_match_pipeline <- function(df, m = 5, seed = 123, replace = TRUE, caliper
                        std.caliper = TRUE
   )
   
-  matched <- complete(matched,"all")
-  matched <- lapply(matched,function(x)x[!is.na(x$subclass),])
+  matched_list <- complete(matched_list,"all")
+  matched_list <- lapply(matched_list,function(x)x[!is.na(x$subclass),])
   
   # ---- Incidence rates, computed once off the first matched imputation ----
-  summary_data <- matched_list[[1]] %>%
+  summary_data <- lapply(matched_list, function(x){
+    x %>%
     group_by(tamsulosin) %>%
     summarise(
       total_cases          = sum(aSAH),
@@ -128,6 +129,7 @@ run_ps_match_pipeline <- function(df, m = 5, seed = 123, replace = TRUE, caliper
       .groups = "drop"
     ) %>%
     mutate(incidence_rate = (total_cases / total_follow_up_years) * 1000)
+  })
   
   # ---- Cox model on each imputation, pooled ----
   cox_fits_crude <- lapply(matched_list, function(d) {
