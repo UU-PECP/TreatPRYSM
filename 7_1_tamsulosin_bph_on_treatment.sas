@@ -4,11 +4,15 @@
 /*  File 7.1: ON-TREATMENT ANALYSIS (BPH) - censor on switch              */
 /*  Adapted from Jos Kanning's amlodipine on-treatment script             */
 /*                                                                          */
-/*  KEY DIFFERENCE FROM JOS'S VERSION:                                     */
-/*  Jos rebuilt bridged coverage in SAS (his Step 21) from AllIndexDrug.   */
-/*  Our treatment episodes were built in R with AdhereR, so instead we     */
-/*  import bph_treatmentepisodes.csv and use its episode.start/episode.end */
-/*  directly as the coverage blocks (AdhereR already did the bridging).    */
+/*  KEY DIFFERENCE FROM JOS'S VERSION:                                     	*/
+/*  Jos rebuilt bridged coverage in SAS (his Step 21) from AllIndexDrug.   	*/
+/*  Our treatment episodes were built in R with AdhereR, so instead we     	*/
+/*  import bph_treatmentepisodes.csv and use its episode.start/episode.end 	*/
+/*  directly as the coverage blocks (AdhereR already did the bridging).  	*/
+/*  Other additions:														*/
+/*	- Name changes (eventdate to issue date									*/
+/*  - Integration into macro which processes 4 data subset files			*/
+/*	- moved covariate creation into file 7_2								*/
 /**************************************************************************/
 
 libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
@@ -19,10 +23,9 @@ options fullstimer;
 /**************************************************************************/
 /* STEP 0: Import R-generated treatment episodes                          */
 /**************************************************************************/
-/* AdhereR compute.treatment.episodes() output, combined across the 3     */
-/* exposures via bind_rows(.id="exposure"), written by write.csv (which   */
-/* adds a leading row-index column, read here as row_index and dropped).  */
-/* patid read as CHARACTER ($19) per CPRD Aurum precision guidance.       */
+/* Original file by Jos uses a SAS only workflow. This version
+/* imports the treatment episodes developed in AdhereR. The outcome of
+AdhereR exports a .csv file that then must be imported into SAS */
 
 data output.bph_treatmentepisodes;
 	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Output\bph_treatmentepisodes.csv"
@@ -34,10 +37,19 @@ data output.bph_treatmentepisodes;
 	format episode_start episode_end date9.;
 run;
 
+proc sql;
+create table output.bph_treatmentepisodes
+select *
+from output.bph_treatmentepisodes
+where patid in (select patid from &in);
+quit;
+
+
 /**************************************************************************/
 /* STEP 19: Determine earliest switch date to a different exposure         */
 /**************************************************************************/
-
+/* The step numbers follow the same step numbers as specified in 
+   Jos's cohort creation files (2)                             */
 /* Map each patient to their index exposure (earliest episode) */
 proc sql;
 	create table output.IndexDrugs as
@@ -195,7 +207,7 @@ quit;
 
 
 /**************************************************************************/
-/* STEP 22.3: Classify recency (Current/Recent/Past), flag aSAH, TV age    */
+/* STEP 22.3: Classify recency (Current/Recent/Past) and flag aSAH        */
 /**************************************************************************/
 proc sort data = output.IntervalCoverage_OT; by patid; run;
 
@@ -252,6 +264,20 @@ quit;
 
 %mend;
 
+data output.drugfile_subset;
+set output.bphdrugatc_1 (obs = 100000);
+run;
+
+%ontreatment(in = output.drugfile_subset, out = output.test_ot_result);
+proc datasets library = work kill nolist;
+run;
+quit;
+
+
+%ontreatment(in = output.bphdrugatc_1, out = output.bph_ot_1);
+proc datasets library = work kill nolist;
+run;
+quit;
 
 %ontreatment(in = output.bphdrugatc_1, out = output.bph_ot_1);
 proc datasets library = work kill nolist;
@@ -282,6 +308,4 @@ proc sort data = output.bph_ot_all;
 by patid;
 run;
 
-data output.test_ot;
-set output.bph_ot_all (obs = 100000);
-run;
+

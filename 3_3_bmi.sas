@@ -106,10 +106,11 @@ run;
 
 * Create a subset of records with BMI values that fall withing a given min-max range (I chose minimum and maximum BMI values ever recorded in adults);
 * Drop duplicates i.e. same value from the same day;
+* Updated possible range based on Shahab's CPRD gold BMI script.
 data BMIEntered_WithinRange;
 	set BMIWtHtRecords_cols;
 	if BMI ne .;
-	if 7 =< BMI =< 260;
+	if 12 =< BMI =< 70;
 run; 
 
 proc sort data = BMIEntered_WithinRange nodupkey; 
@@ -122,7 +123,7 @@ run;
 data WtEntered_WithinRange;
 	set BMIWtHtRecords_cols; 
 	if WeightKG ne .;
-	if 2 =< WeightKG =< 450; 
+	if 25 =< WeightKG =< 250; 
 	* round up values;
 	WeightKG = round(WeightKG, 0.1);
 run; 
@@ -149,7 +150,7 @@ run;
 data HtEntered_WithinRange; 
 	set BMIWtHtRecords_cols; 
 	if HeightM ne .;
-	if 0.5 =< HeightM =< 2.8;
+	if 1 =< HeightM =< 2.5;
 	HeightM = round(HeightM, 0.01);
 run; 
 

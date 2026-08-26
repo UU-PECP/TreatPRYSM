@@ -432,7 +432,7 @@ run;
 quit;
 
 
-data output.all_bph_episodes;
+data output.all_bph_episodes_raw;
 set output.bphdrugatc_1
 output.bphdrugatc_2
 output.bphdrugatc_3
@@ -441,20 +441,20 @@ run;
 
 proc sql;
 select count(distinct patid) as "All Episodes"n
-from output.all_bph_episodes
+from output.all_bph_episodes_raw
 quit;
 
 ***********************************************;
 ************** EXPORTING PATIDS ***************;
 ***********************************************;
 
-proc sort data = output.all_bph_episodes;
+proc sort data = output.all_bph_episodes_raw;
 by patid;
 run;
 
 
 data unique_patients;
-set output.all_bph_episodes (keep = patid);
+set output.all_bph_episodes_raw (keep = patid);
 by patid;
 if first.patid;
 run;
@@ -480,6 +480,30 @@ dbms=tab
 replace;
 run;
 * Patient Count TOTAL 312,957*;
+
+proc sql;
+create table output.all_bph_episodes as
+select r.*
+from output.all_bph_episodes_raw as r
+where r.patid in (select patid from hes_linkage_patients);
+quit;
+
+proc sql;
+select count(distinct patid) as "Linked patients - episodes file"n
+from output.all_bph_episodes;
+quit;
+
+proc sql;
+create table test2 as
+select *
+from output.linked_bph_cohort as a
+inner join output.all_bph_episodes as b on a.patid = b.patid;
+quit;
+
+proc sql;
+select count(distinct patid) as "test2"n
+from test2;
+quit;
 
 /* The following can be used for testing 
 

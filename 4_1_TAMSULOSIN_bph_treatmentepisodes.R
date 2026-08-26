@@ -18,18 +18,29 @@ bphdata_all <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\all_b
 bphdata <- bphdata_all %>% distinct(patid, issuedate, exposure, .keep_all = TRUE)
 bphdata %>% group_by(exposure) %>% count()
 
+linked_patients <- read.table("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Export\\LinkedPatients_tamsulosin.txt")
+
+bphdata <- semi_join(bphdata, linked_patients, by = "patid")
+
 
 drugs <- c(1,2,3)
+
+### splitting the data into chunks by patid
+
+chunks <- split(bphdata, as.integer(factor(bphdata$patid)) %% 20 )
+rm(list = setdiff(ls(), "chunks"))
 
 ### Generating treatment episodes for each drug separately
 
 treat_episode <- list()
 
 for (drug in drugs) {
+  out <- list()
+  for (k in seq_along(chunks)) {
   
-  df_drug <- bphdata %>% filter(exposure == drug)
+  df_drug <- chunks[[k]][chunks[[k]]$exposure == drug, ]
   
-  treat_episode[[drug]] <- compute.treatment.episodes(
+  out[[k]] <- compute.treatment.episodes(
     
     data = df_drug,
     
@@ -80,8 +91,9 @@ for (drug in drugs) {
     return.data.table = TRUE
     
   )
-  
-  
+  cat("drug", drug, "chunk", k, "\n") ## counts progress by chunk and drug
+  }
+  treat_episode[[drug]] <- rbindlist(out)
 }
 
 ### Bind together the three drugs with labelled substance name per episode.
@@ -89,6 +101,10 @@ for (drug in drugs) {
 treat_epi_all <- bind_rows(treat_episode, .id = "exposure")
 
 write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_treatmentepisodes.csv", row.names = FALSE)
+
+#####################################################################
+### QUICK LOAD FROM HERE ###
+#####################################################################
 
 ### Per protocol: keep only first coverage blocks (prioritizes first record in the case of multi-drug)
 
@@ -125,4 +141,4 @@ bph_pp <- bph_pp %>%
 
 
 
-write.csv(bph_filters, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_perprotocol.csv", row.names = FALSE)
+write.csv(bph_pp, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_perprotocol.csv", row.names = FALSE)

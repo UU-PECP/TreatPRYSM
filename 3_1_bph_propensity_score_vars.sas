@@ -105,11 +105,12 @@ data disorders;
     infile datalines delimiter=',';
     input codelist_table : $32. cohort_table : $32. flag_column : $32.;
     datalines;
-    codelist.acidosis, output.acidosis_cohort, acidosis
+	codelist.acidosis, output.acidosis_cohort, acidosis
 	codelist.aids, output.aids_cohort, aids
 	codelist.alcohol, output.alcohol_cohort, alcohol
-    codelist.alzheimers_disease, output.alzheimers_disease_cohort, alzheimers_disease
+	codelist.alzheimers_disease, output.alzheimers_disease_cohort, alzheimers_disease
 	codelist.cancer, output.cancer_cohort, cancer
+	codelist.cirrhosis, output.cirrhosis_cohort, cirrhosis
 	codelist.copd, output.copd_cohort, copd
 	codelist.stroke, output.stroke_cohort, stroke
 	codelist.rheum_disease, output.rheum_cohort, rheum_disease
@@ -117,7 +118,6 @@ data disorders;
 	codelist.heart_failure, output.heart_failure_cohort, heart_failure
 	codelist.hypercholesterolaemia, output.hypercholesterolaemia_cohort, hypercholesterolaemia
 	codelist.hypertension, output.hypertension_cohort, hypertension
-	codelist.cirrhosis, output.cirrhosis_cohort, cirrhosis
 	codelist.nephrolithiasis, output.nephrolith_cohort, nephrolith
 	codelist.paralysis, output.paralysis_cohort, paralysis
 	codelist.peptic_ulcer, output.peptic_ulcer_cohort, peptic_ulcer
@@ -128,3 +128,10 @@ run;
 
 /* Run the main macro to process all disorders */
 %process_disorders;
+
+
+proc sql;
+select count(distinct patid) as "File 3_1 Output"n
+from output.bph_pp_propscor;
+quit;
+

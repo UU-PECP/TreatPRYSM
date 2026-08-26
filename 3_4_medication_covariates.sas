@@ -4,7 +4,7 @@
 ** 	by Sage Wyatt, Jos Kanning, & Shahab Abtahi **
 **	Drug - Tamsulosin							**
 **												**
-**	File 6.1: Comedication covariates (BPH PP)	**
+**	File 3_4: Comedication covariates (BPH PP)	**
 /************************************************/;
 
 libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";

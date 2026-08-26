@@ -5,7 +5,7 @@
 /*                                                                          */
 /*  Adds most-recent-on-or-before-interval BMI and smoking to output.bph_ot */
 /*  (the interval-level table from File 7.1). Same recency logic as Jos's  */
-/*  amlodipine OT script, but pointed at your tables and column names:     */
+/*  amlodipine OT script, but minor changes for CPRD aurum column names:   */
 /*    - BMI:      output.bmi_all,     date = obsdate, value = BMI_final    */
 /*    - Smoking:  output.smoking_all, date = obsdate, flags = smk_cur/ex/non */
 /**************************************************************************/

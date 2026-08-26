@@ -18,6 +18,11 @@ libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists";
 
 options fullstimer; /* Display detailed resource usage info in log */
 
+/* NOTE ON THE % WILDCARD (lines 66-67): the analgesic ATC patterns contain a
+   literal % for LIKE prefix matching. Keep the surrounding statement comments
+   free of apostrophes - an apostrophe in a *-style comment opens a quoted
+   string that swallows %mend and breaks the whole macro (learned the hard way). */
+
 
 ************************************** NEPHROLITHIASIS COHORT ****************************************;
 %macro drugdata(in =, out=);
@@ -190,6 +195,7 @@ T.mean_daily_dose,
 BC.gender,
 BC.regstartdate,
 BC.baseline_dt,
+BC.nl_dt,
 BC.aSAH_gp_dt
 	FROM nl_tam_cleaning AS T
 	INNER JOIN output.nl_cohort AS BC ON BC.patid = T.patid
@@ -278,6 +284,7 @@ proc sql;
 		   p.assumed_duration,
 		   p.prodcodeid,
 		   p.baseline_dt,
+		   p.nl_dt,
 		   e.indexdate,
 		   p.regstartdate,
 		   p.exposure,
@@ -332,18 +339,19 @@ quit;
 
 /**************************************************************************/
 /* STEP 7: Restrict to prescriptions relevant to the stone episode        */
-/* (index Rx within 30 days on or after the NL baseline date)             */
+/* (index Rx within 30 days on or after the NL diagnosis date, nl_dt)      */
 /**************************************************************************/
-/* NL-specific step, retained from the earlier NL pipeline - tamsulosin   */
-/* and analgesics are used for acute stone passage, so an index Rx long   */
-/* after diagnosis is unlikely to relate to that episode.                 */
+/* NL-specific step - tamsulosin and analgesics are used for acute stone  */
+/* passage, so an index Rx long after diagnosis is unlikely to relate to   */
+/* that episode. Keyed off nl_dt (diagnosis), not baseline_dt, since       */
+/* baseline_dt is now registration date and no longer tracks the stone.    */
 
 PROC SQL;
 create table EarliestRxNl_episode AS
 select *
 from EarliestRxNl_washout
-where indexdate - baseline_dt <= 30
-  and indexdate >= baseline_dt;
+where indexdate - nl_dt <= 30
+  and indexdate >= nl_dt;
 quit;
 
 /*HOW MANY PATIENTS*/
@@ -476,8 +484,8 @@ from hes_linkage_patients_nl;
 quit;
 
 proc export data = hes_linkage_patients_nl 
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_tamsulosin_nl.csv"
-dbms=csv
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Export\LinkedPatients_tamsulosin_nl.txt"
+dbms=tab
 replace;
 run;
 
