@@ -45,7 +45,7 @@ df$smk_status <- as.factor(replace_na(df$smk_status, 99))
 #drop variables no longer needed
 df <- df %>%
   select(-episode.ID, -end.episode.gap.days, -episode.duration, -episode.end, -yob,
-         -aSAH_gp_dt, -censordate, -end_of_fu, -episode.start)
+         -aSAH_apc_dt, -censordate, -end_of_fu, -episode.start)
 
 
 df %>% group_by(exposure) %>% count()
@@ -202,7 +202,7 @@ run_full_match <- function(df) {
 # ---------------------------------------------------------
 # 1.3 No matching
 # ---------------------------------------------------------
-run_no_match <- function(df) { browser()
+run_no_match <- function(df) { 
   
   pred_matrix <- make.predictorMatrix(df)
   pred_matrix[, !( dimnames(pred_matrix)[[2]]  %in%  c(vars_cat, "age_at_index") )] <- 0
@@ -249,7 +249,7 @@ run_smrw <- function(df) {
   pred_matrix[, !( dimnames(pred_matrix)[[2]]  %in%  c(vars_cat, "age_at_index") )] <- 0
   
   
-  imputed <- mice(df, m = 5, method = 'pmm', seed = 123, predictorMatrix = pred_matrix)
+  imputed <- mice(df, m = 3, method = 'pmm', seed = 123, predictorMatrix = pred_matrix)
   comp_list <- complete(imputed, "all")
   
   ps_formula <- tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease +
@@ -259,11 +259,13 @@ run_smrw <- function(df) {
     antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
     solifenacin + tadalafil + bmi_value + smk_status
   
+  gc()
+  
  weighted_list <- weightthem(ps_formula,
                             datasets    = imputed,
                             approach    = "within",
                             method      = "glm",
-                            estimatand = "ATT"
+                            estimand    = "ATT"
   )
   
   
@@ -306,12 +308,14 @@ fin_ref <- df[df$exposure %in% c(1,3), ]
 
 
 alf_results_repl <- run_match_with_repl(alf_ref) # the same control can be used for more cases
-
 alf_results_full <- run_full_match(alf_ref[1:1000, ]) # all controls are forcibly matched to an exposed DO NOT RUN FULL DATA (it takes too long)
-
 alf_results_none <- run_no_match(alf_ref) # matching not required due to narrow PS range
-
 alf_results_smrw <- run_smrw(alf_ref) # smr weighting
+
+fin_results_repl <- run_match_with_repl(fin_ref) # the same control can be used for more cases
+fin_results_full <- run_full_match(fin_ref[1:1000, ]) # all controls are forcibly matched to an exposed DO NOT RUN FULL DATA (it takes too long)
+fin_results_none <- run_no_match(fin_ref) # matching not required due to narrow PS range
+fin_results_smrw <- run_smrw(fin_ref) # smr weighting
 
 ####
 
@@ -359,16 +363,9 @@ as.data.frame(alf_results_smrw$summary_data) %>%  writexl::write_xlsx(path = "C:
 
 
 
-alf_results$matched_list[[1]] %>% count(tamsulosin)
-
 
 #Finasteride
-fin_hr <- tbl_regression(fin_results$cox_fit_crude, exponentiate = TRUE)
-fin_hr %>% as_flex_table() %>% save_as_docx(path = "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Export\\finasteride_pp_cox.docx")
-fin_inc <- as.data.frame(fin_results$summary_data)
-fin_inc %>%  writexl::write_xlsx(path = "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Export\\finasteride_pp_inc.xlsx")
 
-fin_results$matched_list[[1]] %>% count(tamsulosin)
 #---------------------------------------
 #Plot incidence over time for both users.
 #Kaplan-Meier stratified by exposure
@@ -426,7 +423,7 @@ save_as_docx(ft, path = "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\D
 
   # Matched
 
-matched_df <- alf_results$matched_list[[1]]
+matched_df <- complete(alf_results_repl$matched_list, 1)
 
 MatchedTable1 <- CreateTableOne(vars = vars, 
                          strata = "exposure", 
@@ -456,7 +453,7 @@ save_as_docx(ft, path = "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\D
 
   # Matched
 
-matched_df <- fin_results$matched_list[[1]]
+matched_df <- complete(fin_results_repl$matched_list, 1)
 
 MatchedTable1 <- CreateTableOne(vars = vars, 
                                 strata = "exposure", 
@@ -482,7 +479,7 @@ save_as_docx(ft, path = "C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\D
 pred_matrix <- make.predictorMatrix(alf_ref)
 pred_matrix[, !( dimnames(pred_matrix)[[2]]  %in%  c(vars_cat, "age_at_index") )] <- 0
 imputed <- mice(alf_ref, m = 5, method = 'pmm', seed = 123, predictorMatrix = pred_matrix)
-alf_list <- complete(imputed, 1)
+d <- complete(imputed, 1)
 
 ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease +
                   cancer + copd + stroke + rheum_disease + diabetes + heart_failure +
@@ -520,7 +517,7 @@ hist(d$pscore[d$tamsulosin==0],100, xlim = c(0.8, 1))
    # Colorful plot
 
 
-output_ps_plot <- function(df, label) { 
+output_ps_plot <- function(df, drug_results, label) { 
   
 
   pred_matrix <- make.predictorMatrix(df)
@@ -540,18 +537,18 @@ imputed_plot <- ggplot(d, aes(x = pscore, fill = factor(tamsulosin))) +
   geom_density(alpha = 0.25, adjust = 2) +
   theme_minimal()+
   scale_fill_manual(values = c("0" = "blue", "1" = "red"), labels = c("Non-User", "User"))+
-  ggtitle(paste0("Density plot for PS in unmatched", label, "cohort"))
+  ggtitle(paste0("Density plot for PS in unmatched ", label, " cohort"))
 
 print(imputed_plot)
 
 ### Matched data
 
-matched_plot <- ggplot(drug_results$matched_list[[1]], aes(x = distance, fill = factor(tamsulosin))) +
+matched_plot <- ggplot(complete(drug_results$matched_list, 1), aes(x = distance, fill = factor(tamsulosin))) +
   geom_density(alpha = 0.25, adjust = 2) +
   labs(x = "Propensity score", y = "Density", fill = "Tamsulosin user") +
   theme_minimal()+
   scale_fill_manual(values = c("0" = "blue", "1" = "red"), labels = c("Non-User", "User"))+
-  ggtitle(paste0("Density plot for PS in matched", label, "cohort"))
+  ggtitle(paste0("Density plot for PS in matched ", label, " cohort"))
 
 ggsave(file.path("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Export", paste0("density_ps_imputed_", label, ".png")),
        plot = imputed_plot,
@@ -564,5 +561,5 @@ ggsave(file.path("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Document
 }
 
 
-output_ps_plot(drug_results = alf_results, label = "alfuzosin")
-output_ps_plot(drug_results = fin_results, label = "finasteride")
+output_ps_plot(df = alf_ref, drug_results = alf_results_repl, label = "alfuzosin")
+output_ps_plot(df = fin_ref, drug_results = fin_results_repl, label = "finasteride")

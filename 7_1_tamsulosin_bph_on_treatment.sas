@@ -19,9 +19,8 @@ libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
 libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
 options fullstimer;
 
-%macro ontreatment(in =, out =);
 /**************************************************************************/
-/* STEP 0: Import R-generated treatment episodes                          */
+/* STEP 0.0: Import R-generated treatment episodes                          */
 /**************************************************************************/
 /* Original file by Jos uses a SAS only workflow. This version
 /* imports the treatment episodes developed in AdhereR. The outcome of
@@ -37,113 +36,89 @@ data output.bph_treatmentepisodes;
 	format episode_start episode_end date9.;
 run;
 
+/**************************************************************************/
+/* STEP 1.0: Create mg Value and Mean Daily Dose                          */
+/**************************************************************************/
+
+/* Sort both datasets for merge */
+proc sort data = output.bph_treatmentepisodes; by patid exposure; run;
+proc sort data = output.all_bph_episodes out = rx_sorted(keep = patid exposure issuedate quantity mg_value); 
+  by patid exposure issuedate; 
+run;
+
+/* Join prescriptions to episodes, keep only those within episode window */
 proc sql;
-create table output.bph_treatmentepisodes
-select *
-from output.bph_treatmentepisodes
-where patid in (select patid from &in);
+  create table output.episodes_with_qty as
+  select e.patid,
+         e.exposure,
+         e.episode_ID,
+         e.episode_start,
+         e.episode_end,
+         sum(r.quantity) as total_tablets,
+		 mean(r.mg_value) as mean_daily_dose
+  from output.bph_treatmentepisodes e
+       inner join rx_sorted r
+       on e.patid = r.patid
+       and e.exposure = r.exposure
+       and r.issuedate >= e.episode_start
+       and r.issuedate <= e.episode_end
+  group by e.patid, e.exposure, e.episode_ID, e.episode_start, e.episode_end;
 quit;
 
+/* Merge back onto treatment episodes */
+proc sort data = output.episodes_with_qty; by patid exposure episode_ID; run;
+proc sort data = output.bph_treatmentepisodes; by patid exposure episode_ID; run;
+
+data output.bph_treatmentepisodes_mgqty;
+  merge output.bph_treatmentepisodes(in=a)
+        output.episodes_with_qty(in=b);
+  by patid exposure episode_ID;
+  if a;
+run;
+
+data output.bph_treatmentepisodes_mgqty;
+set output.bph_treatmentepisodes_mgqty;
+cumulative_dose = total_tablets*mean_daily_dose;
+run;
 
 /**************************************************************************/
-/* STEP 19: Determine earliest switch date to a different exposure         */
+/* STEP 1.1: Create end of follow-up variable                             */
 /**************************************************************************/
-/* The step numbers follow the same step numbers as specified in 
-   Jos's cohort creation files (2)                             */
-/* Map each patient to their index exposure (earliest episode) */
-proc sql;
-	create table output.IndexDrugs as
-	select patid, exposure as index_exposure
-	from output.bph_treatmentepisodes
-	group by patid
-	having episode_start = min(episode_start);
-quit;
 
-/* Earliest prescription of a DIFFERENT exposure = switch_date */
-proc sql;
-	create table output.SwitchDates as
-	select r.patid,
-		   min(r.issuedate) as switch_date format=date9.
-	from &in r
-		 inner join output.IndexDrugs i
-		 on r.patid = i.patid
-	where r.exposure ne i.index_exposure
-	group by r.patid;
-quit;
+proc sort data = output.bph_cohort;
+by patid;
+run;
 
-
-/**************************************************************************/
-/* STEP 20: Build on-treatment follow-up dataset, censor at switch         */
-/**************************************************************************/
-/* Uses the earliest episode per patient for index_date/index_exposure,    */
-/* your File-1 censordate (already the min of regend/death/lcd/studyend),   */
-/* aSAH_gp_dt, and the switch date.                                        */
-
-/* one row per patient: their index (earliest) episode */
-proc sql;
-	create table output.FirstEpisode as
-	select *
-	from output.bph_treatmentepisodes
-	group by patid
-	having episode_start = min(episode_start);
-quit;
-
-proc sort data = output.FirstEpisode; by patid; run;
-proc sort data = output.bph_cohort out = base_cohort_ot; by patid; run;
-proc sort data = output.SwitchDates; by patid; run;
-
-data output.OverallFollowup_OnT;
-	merge output.FirstEpisode(in=inE)
-		  base_cohort_ot(in=inB keep=patid censordate aSAH_gp_dt) 
-		  output.SwitchDates(in=inS);
+data output.bph_treatmentepisodes_fu;
+	merge output.bph_treatmentepisodes_mgqty(in=inA)
+		  output.bph_cohort(in=inB
+			 keep=patid censordate aSAH_apc_dt);
 	by patid;
-	if inE and inB;
-
-	index_date     = episode_start;
+	if inA and inB;
+	index_date = earliest_rx_date;
 	index_exposure = exposure;
-	end_of_fu      = '31MAR2025'd;
+	end_of_fu = '31MAR2025'd;
 
-	/* censordate already folds in reg end / death / lcd / study end from File 1 */
-	if not missing(censordate)  and censordate  < end_of_fu then end_of_fu = censordate;
-	if not missing(aSAH_gp_dt)  and aSAH_gp_dt  < end_of_fu then end_of_fu = aSAH_gp_dt;
+	if not missing(censordate) and censordate < end_of_fu then end_of_fu = censordate;
+	if not missing(aSAH_apc_dt) and aSAH_apc_dt < end_of_fu then end_of_fu = aSAH_apc_dt;
 
-	/* additional on-treatment censoring at switch, if earlier */
-	if inS and not missing(switch_date) and switch_date < end_of_fu then end_of_fu = switch_date;
+	/* Additional censoring at switch_date if it exists and is earlier */
+	if not missing(episode_end) and episode_end < end_of_fu then end_of_fu = episode_end;
 
-	/* keep only valid follow-up */
+	/* Only keep if valid follow-up (index_date < end_of_fu */
 	if index_date < end_of_fu;
 
 	format index_date end_of_fu date9.;
 run;
 
-
 /**************************************************************************/
-/* STEP 21: Coverage blocks for the index drug (from AdhereR episodes)     */
-/**************************************************************************/
-/* Jos rebuilt bridging here; AdhereR already did it. We just take each     */
-/* patient's episodes of their INDEX exposure as the coverage blocks.      */
-
-proc sql;
-	create table output.BridgeCoverage_IndexDrug as
-	select e.patid,
-		   e.episode_start as bridged_coverage_start format=date9.,
-		   e.episode_end   as bridged_coverage_end   format=date9.
-	from output.bph_treatmentepisodes e
-		 inner join output.IndexDrugs i
-		 on e.patid = i.patid
-	where e.exposure = i.index_exposure
-	order by e.patid, e.episode_start;
-quit;
-
-
-/**************************************************************************/
-/* STEP 22.0: Build 30-day intervals from index_date to end_of_fu          */
+/* STEP 2.0: Build 30-day intervals from index_date to end_of_fu          */
 /**************************************************************************/
 data output.ThirtyDayIntervals_OnT;
-	set output.OverallFollowup_OnT;
+	set output.bph_treatmentepisodes_fu;
 	by patid;
 
-	interval_window_start = index_date;
+	interval_window_start = episode_start;
 	do while (interval_window_start <= end_of_fu);
 		interval_window_end = min(interval_window_start + 29, end_of_fu);
 		output;
@@ -155,13 +130,13 @@ run;
 
 
 /**************************************************************************/
-/* STEP 22.1: Carry most-recent per-Rx dose (mg_value) into each interval  */
+/* STEP 2.1: Carry most-recent per-Rx dose (mg_value) into each interval  */
 /**************************************************************************/
 /* mg_value is per-prescription in Rx_bph_PostStart; propagate the most    */
 /* recent value forward across intervals (time-varying dose).              */
 
-proc sort data = &in
-          out  = rx_sorted(keep=patid issuedate mg_value);
+proc sort data = output.all_bph_episodes
+          out  = mg_sorted(keep=patid issuedate mg_value);
 	by patid issuedate;
 run;
 
@@ -172,7 +147,7 @@ proc sort data = output.ThirtyDayIntervals_OnT
 run;
 
 data output.IntervalDose;
-	merge rx_sorted(in=inRx)
+	merge mg_sorted(in=inRx)
 	      int_sorted(in=inInt);
 	by patid issuedate;
 	retain last_dose;
@@ -188,7 +163,7 @@ run;
 
 
 /**************************************************************************/
-/* STEP 22.2: Last coverage block starting on/before interval_window_start */
+/* STEP 2.2: Last coverage block starting on/before interval_window_start */
 /**************************************************************************/
 proc sql;
 	create table output.IntervalCoverage_OT as
@@ -207,7 +182,7 @@ quit;
 
 
 /**************************************************************************/
-/* STEP 22.3: Classify recency (Current/Recent/Past) and flag aSAH        */
+/* STEP 2.3: Classify recency (Current/Recent/Past) and flag aSAH        */
 /**************************************************************************/
 proc sort data = output.IntervalCoverage_OT; by patid; run;
 
@@ -258,51 +233,14 @@ proc sql;
 		   median(fu_days) as median_fu_days,
 		   mean(fu_days) as mean_fu_days,
 		   sum(aSAH_within_interval) as n_asah_cases
-	from &out
+	from output.bph_ot_all
 	group by index_exposure;
 quit;
 
-%mend;
 
 data output.drugfile_subset;
 set output.bphdrugatc_1 (obs = 100000);
 run;
-
-%ontreatment(in = output.drugfile_subset, out = output.test_ot_result);
-proc datasets library = work kill nolist;
-run;
-quit;
-
-
-%ontreatment(in = output.bphdrugatc_1, out = output.bph_ot_1);
-proc datasets library = work kill nolist;
-run;
-quit;
-
-%ontreatment(in = output.bphdrugatc_1, out = output.bph_ot_1);
-proc datasets library = work kill nolist;
-run;
-quit;
-
-%ontreatment(in = output.bphdrugatc_2, out = output.bph_ot_2);
-proc datasets library = work kill nolist;
-run;
-quit;
-
-%ontreatment(in = output.bphdrugatc_3, out = output.bph_ot_3);
-proc datasets library = work kill nolist;
-run;
-quit;
-
-%ontreatment(in = output.bphdrugatc_4, out = output.bph_ot_4);
-proc datasets library = work kill nolist;
-run;
-quit;
-
-data output.bph_ot_all;
-set output.bph_ot_1 output.bph_ot_2 output.bph_ot_3 output.bph_ot_4;
-run;
-
 
 proc sort data = output.bph_ot_all;
 by patid;

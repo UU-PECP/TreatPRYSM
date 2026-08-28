@@ -19,7 +19,7 @@ options fullstimer;
 /* PREREQUISITES - built elsewhere, reused here (do NOT rebuild):         */
 /*   output.clinical          (File 1_0)                                  */
 /*   output.initial_cohort    (File 1_0)                                  */
-/*   output.aSAH_gp           (File 1_1, Step 4)                          */
+/*   output.aSAH_apc          (File 1_1, HES APC)                         */
 /*   output.rarediseasecases  (File 1_1)                                  */
 /* Run File 1_0 and File 1_1 before this script.                          */
 /**************************************************************************/
@@ -84,19 +84,19 @@ from output.NL_initial;
 quit;
 
 
-* STEP 7: Retrieve aSAH cases (GP-recorded, temporary until HES APC incorporated) *;
+* STEP 7: Retrieve aSAH cases (HES APC) *;
 
 proc SQL;
 	CREATE TABLE output.nl_cohort AS
 	SELECT bc.*, 
-		   aSAH.aSAH_dt as aSAH_gp_dt
+		   aSAH.aSAH_dt as aSAH_apc_dt
 	FROM output.NL_initial AS bc
-	LEFT OUTER JOIN output.aSAH_gp AS aSAH ON bc.patid = aSAH.patid;
+	LEFT OUTER JOIN output.aSAH_apc AS aSAH ON bc.patid = aSAH.patid;
 quit;
 
 proc SQL;
 SELECT COUNT(*) as n_asah FROM output.nl_cohort
-WHERE aSAH_gp_dt IS NOT NULL;
+WHERE aSAH_apc_dt IS NOT NULL;
 quit;
 
 
@@ -105,9 +105,9 @@ quit;
 data output.nl_cohort;
 	set output.nl_cohort;
 
-	*Define baseline dt as registration start date, floored at NL study start (01DEC2007);
+	*Define baseline dt as the later of registration start date or nl_dt, floored at NL study start (01DEC2007);
 	informat baseline_dt DDMMYY10.;
-	baseline_dt = regstartdate;
+	baseline_dt = max(of regstartdate nl_dt);
 	if baseline_dt < '01DEC2007'd then baseline_dt = '01DEC2007'd;
 	format baseline_dt DDMMYY10.;
 	run;
@@ -166,7 +166,7 @@ by patid;
 run;
 
 data output.nl_cohort;
-set nl_rarediseaseexc (keep = patid gender yob regstartdate nl_dt aSAH_gp_dt baseline_dt censordate reg_age);
+set nl_rarediseaseexc (keep = patid gender yob regstartdate nl_dt aSAH_apc_dt baseline_dt censordate reg_age);
 by patid;
 if first.patid;
 run;

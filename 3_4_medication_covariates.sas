@@ -183,7 +183,7 @@ codelist.tadalafil5|output.tadalafil5_cohort|G04CA54|tadalafil5
 run;
 
 /* Run the main macro to process all medication classes */
-%process_medications(d;
+%process_medications;
 
 
 data output.bph_pp_meds;

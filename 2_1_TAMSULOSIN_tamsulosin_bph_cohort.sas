@@ -46,8 +46,7 @@ proc sql;
 		   r.quantity,
 		   r.duration,
 		   r.prodcodeid,
-		   c.atc,
-		   c.strength
+		   c.atc
 	FROM &drugfile as r  
 inner join codelist.&var._codes as c on strip(c.prodcodeid) = strip(r.prodcodeid);
 quit;
@@ -55,7 +54,7 @@ quit;
 
 %mend product;
 
-%product (var=tamsulosin, atccode = 'G04CA02', drugfile = &in); 
+%product (var=tamsulosin_mono, atccode = 'G04CA02', drugfile = &in); 
 %product (var=tamsulosin_poly1, atccode = 'G04CA52', drugfile = &in); 
 %product (var=tamsulosin_poly2, atccode = 'G04CA53', drugfile = &in); 
 %product (var=tamsulosin_poly3, atccode = 'G04CA54', drugfile = &in); 
@@ -71,7 +70,7 @@ quit;
 *** append drugs records for all drugs and create numeric exposure variable;
 
 data output.bph_drugs;
-set output.tamsulosin_drugs (in = a)
+set output.tamsulosin_mono_drugs (in = a)
 output.tamsulosin_poly1_drugs (in = b)
 output.tamsulosin_poly2_drugs (in = c) 
 output.tamsulosin_poly3_drugs (in = d)
@@ -83,7 +82,18 @@ else if e then exposure = 2;
 else if f or g then exposure = 3;
 run;
 
+data mg_lookup;
+	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists\Bph_drugs_mgvalue_lookup_table.txt" dsd dlm='09'x firstobs=2 truncover;
+	length ProdcodeId $19 mg_value 8 ;
+	input ProdcodeId :$19. mg_value;
+run;
 
+proc sql;
+create table output.bph_drugs as
+select b.*, m.mg_value
+from output.bph_drugs as b
+inner join mg_lookup as m on b.prodcodeid = m.prodcodeid;
+quit;
 
 
 /****************************************************************************/
@@ -136,6 +146,7 @@ T.dosageid,
 T.quantity,
 T.assumed_duration,
 T.prodcodeid,
+T.mg_value,
 BC.regstartdate,
 BC.baseline_dt
 	FROM bph_tam_cleaning AS T
@@ -357,30 +368,30 @@ TOTAL 320,384
 /*
 /**************************************************************************/
 /* STEP 8: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx   */
-/* (COMMENTED OUT until HES APC linkage is incorporated )                      */
+/* (COMMENTED OUT until HES APC linkage is incorporated )                 */
 /**************************************************************************/
 /* If a patient's first aSAH date (HOSP ONLY) is before earliest Rx, we drop them.    */
 /* NOTE: DO NOT RUN UNTIL HES APC LINKAGE */
 /* NOTE: Jos's version requires both hospital and gp data so I have written new script myself for the timebeing*/
 
-*proc sql;
-*CREATE TABLE EarliestRxBph_Filtered AS
-SELECT d1.* , d2.patid, d2.aSAH_gp_dt
+proc sql;
+CREATE TABLE aSAH_Filter AS
+SELECT d1.* , d2.patid, d2.aSAH_apc_dt
 FROM Min_365_days_washout as d1
-INNER JOIN output.linked_bph_cohort as d2 
+INNER JOIN output.bph_cohort as d2 
 ON d1.patid = d2.patid
-	WHERE d2.aSAH_gp_dt > indexdate or d2.aSAH_gp_dt is NULL;
-*quit;
+	WHERE d2.aSAH_apc_dt > indexdate or d2.aSAH_apc_dt is NULL;
+quit;
 
 /*HOW MANY PATIENTS*/
-*proc sql;
-*select count(distinct patid) as "Step 8: prior aSAH"n
-from EarliestRxBph_Filtered 
+proc sql;
+select count(distinct patid) as "Step 8: prior aSAH"n
+from aSAH_Filter 
 quit;
 
 
 /**************************************************************************/
-/* STEP 8: Retrieiving all treatment episodes from patients with exclusion criteria specified in steps 5 & 6   */
+/* STEP 9: Retrieiving all treatment episodes from patients with exclusion criteria specified in steps 5 & 6   */
 /**************************************************************************/
 
 /* FINAL PRODUCT */
@@ -388,7 +399,7 @@ quit;
 proc sql; 
 create table Distinct_patients as
 select distinct patid, indexdate
-from Min_365_days_washout; ** change after hospital aSAH records;
+from aSAH_Filter; ** change after hospital aSAH records;
 quit;
 
 proc sql;
@@ -402,30 +413,30 @@ quit;
 %mend;
 
 /**************************************************************************/
-/* STEP 9: Combine all four drugissue files                              */
+/* STEP 10: Combine all four drugissue files                              */
 /**************************************************************************/
 
 * real data input;
 
-%drugdata(in=rawdata.drugissue_1, out=output.bphdrugatc_1)
+%drugdata(in=rawdata.drugissue_1, out=output.bphdrugatc_1);
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_2, out= output.bphdrugatc_2)
+%drugdata(in=rawdata.drugissue_2, out= output.bphdrugatc_2);
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_3, out= output.bphdrugatc_3)
+%drugdata(in=rawdata.drugissue_3, out= output.bphdrugatc_3);
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%drugdata(in=rawdata.drugissue_4, out= output.bphdrugatc_4)
+%drugdata(in=rawdata.drugissue_4, out= output.bphdrugatc_4);
 
 proc datasets library = work kill nolist;
 run;
@@ -493,32 +504,24 @@ select count(distinct patid) as "Linked patients - episodes file"n
 from output.all_bph_episodes;
 quit;
 
-proc sql;
-create table test2 as
-select *
-from output.linked_bph_cohort as a
-inner join output.all_bph_episodes as b on a.patid = b.patid;
-quit;
 
-proc sql;
-select count(distinct patid) as "test2"n
-from test2;
-quit;
+/* ---------------------------------------------------------------------- */
+/* TESTING ONLY - commented out so a full top-to-bottom run does not       */
+/* overwrite output.Rx_bph_PostStart, output.bph_drugs and the codelist    */
+/* tables with the TEST subset. Uncomment deliberately when testing.       */
+/* ---------------------------------------------------------------------- */
 
-/* The following can be used for testing 
-
-* data subset test for shorter runtime;
-
+/*
 data output.drugissue_TEST;
 set rawdata.drugissue_2;
 where input(patid, 19.) > 2000000000 and input(patid, 19.) < 10000000000;
 run;
 
-
 %drugdata(in=output.drugissue_TEST, out=output.bph_episodes_TEST);
+*/
 
 
-
+/*
 
 
 * Exposure extraction check by Shahab - Aug 2026 ;

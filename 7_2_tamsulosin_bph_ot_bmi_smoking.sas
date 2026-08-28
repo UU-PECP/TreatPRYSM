@@ -5,7 +5,8 @@
 /*                                                                          */
 /*  Adds most-recent-on-or-before-interval BMI and smoking to output.bph_ot */
 /*  (the interval-level table from File 7.1). Same recency logic as Jos's  */
-/*  amlodipine OT script, but minor changes for CPRD aurum column names:   */
+/*  amlodipine OT script, but using Magda's script for BMI and smoking in 
+/*  CPRD aurum. In addition, minor changes for CPRD aurum column names:   */
 /*    - BMI:      output.bmi_all,     date = obsdate, value = BMI_final    */
 /*    - Smoking:  output.smoking_all, date = obsdate, flags = smk_cur/ex/non */
 /**************************************************************************/
@@ -13,7 +14,7 @@
 libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
 options fullstimer;
 
-%LET inputfile = output.test_ot;
+%LET inputfile = output.bph_ot_all;
 
 /**************************************************************************/
 /* Dedupe BMI to one row per patient+obsdate (keep highest BMI on a day)   */

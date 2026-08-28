@@ -18,11 +18,6 @@ libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists";
 
 options fullstimer; /* Display detailed resource usage info in log */
 
-/* NOTE ON THE % WILDCARD (lines 66-67): the analgesic ATC patterns contain a
-   literal % for LIKE prefix matching. Keep the surrounding statement comments
-   free of apostrophes - an apostrophe in a *-style comment opens a quoted
-   string that swallows %mend and breaks the whole macro (learned the hard way). */
-
 
 ************************************** NEPHROLITHIASIS COHORT ****************************************;
 %macro drugdata(in =, out=);
@@ -178,7 +173,7 @@ run;
 /****************************************************************************/
 
 *** Join cleaned prescription records with base cohort; 
-*** aSAH_gp_dt and gender carried through for the exposure-specific aSAH counts;
+*** aSAH_apc_dt and gender carried through for the exposure-specific aSAH counts;
 
 PROC SQL;
 CREATE TABLE nl_tam AS
@@ -195,8 +190,7 @@ T.mean_daily_dose,
 BC.gender,
 BC.regstartdate,
 BC.baseline_dt,
-BC.nl_dt,
-BC.aSAH_gp_dt
+BC.aSAH_apc_dt
 	FROM nl_tam_cleaning AS T
 	INNER JOIN output.nl_cohort AS BC ON BC.patid = T.patid
 ORDER BY T.assumed_duration, T.patid, T.issuedate; 
@@ -284,13 +278,12 @@ proc sql;
 		   p.assumed_duration,
 		   p.prodcodeid,
 		   p.baseline_dt,
-		   p.nl_dt,
 		   e.indexdate,
 		   p.regstartdate,
 		   p.exposure,
 		   p.atc,
 		   p.gender,
-		   p.aSAH_gp_dt
+		   p.aSAH_apc_dt
 	from output.NlEarliestDate as e
 		left join output.Rx_nl_PostStart as p 
 		on p.patid = e.patid
@@ -339,19 +332,18 @@ quit;
 
 /**************************************************************************/
 /* STEP 7: Restrict to prescriptions relevant to the stone episode        */
-/* (index Rx within 30 days on or after the NL diagnosis date, nl_dt)      */
+/* (index Rx within 30 days on or after the NL baseline date)             */
 /**************************************************************************/
-/* NL-specific step - tamsulosin and analgesics are used for acute stone  */
-/* passage, so an index Rx long after diagnosis is unlikely to relate to   */
-/* that episode. Keyed off nl_dt (diagnosis), not baseline_dt, since       */
-/* baseline_dt is now registration date and no longer tracks the stone.    */
+/* NL-specific step, retained from the earlier NL pipeline - tamsulosin   */
+/* and analgesics are used for acute stone passage, so an index Rx long   */
+/* after diagnosis is unlikely to relate to that episode.                 */
 
 PROC SQL;
 create table EarliestRxNl_episode AS
 select *
 from EarliestRxNl_washout
-where indexdate - nl_dt <= 30
-  and indexdate >= nl_dt;
+where indexdate - baseline_dt <= 30
+  and indexdate >= baseline_dt;
 quit;
 
 /*HOW MANY PATIENTS*/
@@ -374,7 +366,7 @@ SELECT d1.*
 FROM EarliestRxNl_Filtered as d1
 INNER JOIN output.linked_nl_cohort as d2 
 ON d1.patid = d2.patid
-	WHERE d1.aSAH_gp_dt > indexdate or d1.aSAH_gp_dt is NULL;
+	WHERE d1.aSAH_apc_dt > indexdate or d1.aSAH_apc_dt is NULL;
 *quit;
 
 /*HOW MANY PATIENTS*/
@@ -484,8 +476,8 @@ from hes_linkage_patients_nl;
 quit;
 
 proc export data = hes_linkage_patients_nl 
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Export\LinkedPatients_tamsulosin_nl.txt"
-dbms=tab
+outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_tamsulosin_nl.csv"
+dbms=csv
 replace;
 run;
 
@@ -504,7 +496,7 @@ data nl_patients_unique;
 set output.all_nl_episodes;
 by patid;
 if first.patid;
-if aSAH_gp_dt = . then aSAH = 0;
+if aSAH_apc_dt = . then aSAH = 0;
 else aSAH = 1;
 run;
 

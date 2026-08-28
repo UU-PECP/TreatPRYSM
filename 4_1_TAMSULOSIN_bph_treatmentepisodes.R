@@ -18,17 +18,12 @@ bphdata_all <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\all_b
 bphdata <- bphdata_all %>% distinct(patid, issuedate, exposure, .keep_all = TRUE)
 bphdata %>% group_by(exposure) %>% count()
 
-linked_patients <- read.table("C:\\Users\\Wyatt003\\OneDrive - Universiteit Utrecht\\Documents\\Export\\LinkedPatients_tamsulosin.txt")
-
-bphdata <- semi_join(bphdata, linked_patients, by = "patid")
-
-
 drugs <- c(1,2,3)
 
 ### splitting the data into chunks by patid
 
 chunks <- split(bphdata, as.integer(factor(bphdata$patid)) %% 20 )
-rm(list = setdiff(ls(), "chunks"))
+
 
 ### Generating treatment episodes for each drug separately
 
@@ -98,7 +93,11 @@ for (drug in drugs) {
 
 ### Bind together the three drugs with labelled substance name per episode.
 
-treat_epi_all <- bind_rows(treat_episode, .id = "exposure")
+treat_epi_all <- bind_rows(treat_episode, .id = "exposure") %>%
+  mutate(patid = as.character(patid),
+         exposure = as.numeric(exposure))
+
+### Save file
 
 write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_treatmentepisodes.csv", row.names = FALSE)
 
@@ -106,9 +105,15 @@ write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_
 ### QUICK LOAD FROM HERE ###
 #####################################################################
 
-### Per protocol: keep only first coverage blocks (prioritizes first record in the case of multi-drug)
 
-treat_epi_all <- read.csv("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_treatmentepisodes.csv")
+### Per protocol: keep only first coverage blocks (prioritizes first record in the case of multi-drug)
+ 
+treat_epi_all <- read.csv("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_treatmentepisodes.csv") %>%
+  mutate(patid = as.character(patid),
+         exposure = as.numeric(exposure),
+         episode.start = as.Date(episode.start),
+         episode.end = as.Date(episode.end)
+  )
 
 pp_epi <- treat_epi_all %>% group_by(patid) %>% 
                              slice_min(episode.start, n = 1, with_ties = FALSE) %>% 
@@ -117,11 +122,10 @@ pp_epi <- treat_epi_all %>% group_by(patid) %>%
 ### Combine treatment episode info with base cohort
 bph_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_pp_ps_bmismk.sas7bdat")
 bph_cohort <- bph_cohort %>% distinct(patid, .keep_all = TRUE) 
-fu_vars <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_gp_dt, yob))
+fu_vars <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_apc_dt, yob))
 bph_cohort <- left_join(bph_cohort, fu_vars, by = "patid")
 
 bph_pp <- inner_join(pp_epi, bph_cohort, by = "patid")
-
 
 ### Apply end of follow-up rules
 
@@ -132,13 +136,14 @@ bph_pp <- bph_pp %>%
   mutate(end_of_fu = lubridate::ymd(episode.end)) %>% 
   mutate(end_of_fu = end_of_fu %>% replace_when(
     !is.na(censordate) & censordate < end_of_fu & censordate > lubridate::ymd('2002-10-31') ~ censordate,
-    !is.na(aSAH_gp_dt) & aSAH_gp_dt < end_of_fu & aSAH_gp_dt > lubridate::ymd('2002-10-31') ~ aSAH_gp_dt,
+    !is.na(aSAH_apc_dt) & aSAH_apc_dt < end_of_fu & aSAH_apc_dt > lubridate::ymd('2002-10-31') ~ aSAH_apc_dt,
     lubridate::ymd('2025-03-31') < end_of_fu ~ lubridate::ymd('2025-03-31')
   )) %>% 
-  mutate(aSAH = if_else(!is.na(aSAH_gp_dt) & aSAH_gp_dt <= end_of_fu, 1, 0))%>%
+  mutate(aSAH = if_else(!is.na(aSAH_apc_dt) & aSAH_apc_dt <= end_of_fu, 1, 0))%>%
   mutate(fu_days = ymd(end_of_fu) - ymd(episode.start)) 
   
 
 
 
 write.csv(bph_pp, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_perprotocol.csv", row.names = FALSE)
+

@@ -148,154 +148,22 @@ quit;
 ***** SANITY CHECKING *****
 ***************************;
 
-title "acidosis";
-proc freq data = output.bph_pp_ps_bmismk;
-tables acidosis;
-run;
+/* One pass over every covariate flag, replacing the 30 separate proc freqs. */
+/* Note: liver_failure was dropped (not built in 3_1) and nephrolithiasis    */
+/* renamed to nephrolith to match the flag_column in the disorders list.     */
+/* cirrhosis and alcohol added - both now built in 3_1.                      */
 
-title "aids";
+title "Covariate flags - BPH per-protocol propensity score set";
 proc freq data = output.bph_pp_ps_bmismk;
-tables aids;
+tables acidosis aids alcohol alzheimers_disease cancer cirrhosis copd stroke
+       rheum_disease diabetes heart_failure hypercholesterolaemia hypertension
+       nephrolith paralysis peptic_ulcer pvd ckd
+       antihypertensives lipid_lowering anticoagulants nsaids opioids
+       antiemetics antidiabetics snri dutasteride solifenacin tadalafil
+       smk_status / missing;
 run;
+title;
 
-title "alcohol";
-proc freq data = output.bph_pp_ps_bmismk;
-tables alcohol;
+proc means data = output.bph_pp_ps_bmismk n nmiss mean std min max;
+var bmi_value;
 run;
-
-title "alzheimers disease";
-proc freq data = output.bph_pp_ps_bmismk;
-tables alzheimers_disease;
-run;
-
-title "cancer";
-proc freq data = output.bph_pp_ps_bmismk;
-tables cancer;
-run;
-
-title "copd";
-proc freq data = output.bph_pp_ps_bmismk;
-tables copd;
-run;
-
-title "stroke";
-proc freq data = output.bph_pp_ps_bmismk;
-tables stroke;
-run;
-
-title "rheumatological disease";
-proc freq data = output.bph_pp_ps_bmismk;
-tables rheum_disease;
-run;
-
-title "diabetes";
-proc freq data = output.bph_pp_ps_bmismk;
-tables diabetes;
-run;
-
-title "heart failure";
-proc freq data = output.bph_pp_ps_bmismk;
-tables heart_failure;
-run;
-
-title "hypercholesterolaemia";
-proc freq data = output.bph_pp_ps_bmismk;
-tables hypercholesterolaemia;
-run;
-
-title "hypertension";
-proc freq data = output.bph_pp_ps_bmismk;
-tables hypertension;
-run;
-
-title "liver failure";
-proc freq data = output.bph_pp_ps_bmismk;
-tables liver_failure;
-run;
-
-title "nephrolithiasis";
-proc freq data = output.bph_pp_ps_bmismk;
-tables nephrolithiasis;
-run;
-
-title "acidosis";
-proc freq data = output.bph_pp_ps_bmismk;
-tables paralysis;
-run;
-
-title "peptic ulcer disease";
-proc freq data = output.bph_pp_ps_bmismk;
-tables peptic_ulcer;
-run;
-
-title "peripheral vascular disease";
-proc freq data = output.bph_pp_ps_bmismk;
-tables pvd;
-run;
-
-title "chronic kidney disease";
-proc freq data = output.bph_pp_ps_bmismk;
-tables ckd;
-run;
-
-title "antihypertensives";
-proc freq data = output.bph_pp_ps_bmismk;
-tables antihypertensives;
-run;
-
-title "lipid-lowering medications";
-proc freq data = output.bph_pp_ps_bmismk;
-tables lipid_lowering;
-run;
-
-title "anticoagulants";
-proc freq data = output.bph_pp_ps_bmismk;
-tables anticoagulants;
-run;
-
-title "nsaids";
-proc freq data = output.bph_pp_ps_bmismk;
-tables nsaids;
-run;
-
-title "opioids";
-proc freq data = output.bph_pp_ps_bmismk;
-tables opioids;
-run;
-
-title "antiemetics";
-proc freq data = output.bph_pp_ps_bmismk;
-tables antiemetics;
-run;
-
-title "antidiabetics";
-proc freq data = output.bph_pp_ps_bmismk;
-tables antidiabetics;
-run;
-
-title "snri";
-proc freq data = output.bph_pp_ps_bmismk;
-tables snri;
-run;
-
-title "dutasteride";
-proc freq data = output.bph_pp_ps_bmismk;
-tables dutasteride;
-run;
-
-title "solifenacin";
-proc freq data = output.bph_pp_ps_bmismk;
-tables solifenacin;
-run;
-
-title "tadalafil";
-proc freq data = output.bph_pp_ps_bmismk;
-tables tadalafil;
-run;
-
-title "smoking";
-proc freq data = output.bph_pp_ps_bmismk;
-tables smk_status;
-run;
-
- 

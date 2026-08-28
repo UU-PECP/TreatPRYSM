@@ -16,8 +16,8 @@ options fullstimer;
 
 
 
-*Step 4: TEMPORARY find aSAH cases in clinical file;
-	* replace with HES data when available;
+*Step 4: find GP aSAH cases in clinical file;
+/* GP data
 proc sql;
 	CREATE TABLE output.aSAH_gp AS
 	SELECT 
@@ -31,9 +31,45 @@ proc sql;
 )
 	GROUP BY clin.patid;
 quit;
+*/
 
+/* HES Data */
 
-*Build rare disease codelist once, used by both BPH and NL cohorts below;
+data rawdata.hes_hosp;
+	infile "F:\Users\Wyatt003\files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\hes_diagnosis_hosp_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
+	length patid $19 spno $12 admidate 8 discharged 8 ICD $5 ICDx $1;
+	input patid :$19. spno :$12. admidate :yymmdd10. discharged :yymmdd10. ICD :$5. ICDx :$1.;
+	format admidate discharged date9.;
+run;
+
+proc sql;
+	CREATE TABLE output.aSAH_apc AS
+	SELECT 
+		clin.patid, MIN(clin.admidate) AS aSAH_dt format=ddmmyy10., clin.ICD, clin.ICDx
+	FROM 
+		rawdata.hes_hosp AS clin
+	WHERE clin.ICD IN (
+		"I60", "I60.0", "I60.0", "I60.01", "I60.02",
+		"I60.1", "I60.10", "I60.11", "I60.12",
+		"I60.2", "I60.3", "I60.30", "I60.31", 
+		"I60.32", "I60.4", "I60.5", "I60.50", 
+		"I60.51", "I60.52", "I60.6", "I60.7", 
+		"I60.8", "I60.9"
+)
+	GROUP BY clin.patid;
+quit;
+
+* testing *;
+
+proc freq data = output.aSAH_apc;
+	tables ICD / missing;
+run;
+
+proc freq data = output.aSAH_apc;
+	tables ICDx / missing;
+run;
+
+	*Build rare disease codelist once, used by both BPH and NL cohorts below;
 
 
 data RareDisease_cod;
@@ -118,23 +154,24 @@ PROC SQL;
 quit;
 		**644621 patients;
 
-* STEP 7: Retrieve aSAH cases (GP-recorded, temporary until HES APC incorporated) *;
+* STEP 7: Retrieve aSAH cases *;
 
 proc SQL;
 	CREATE TABLE output.bph_cohort AS
 	SELECT bc.*, 
-		   aSAH.aSAH_dt as aSAH_gp_dt
+		   aSAH.aSAH_dt as aSAH_apc_dt
 	FROM output.BPH_initial AS bc
-	LEFT OUTER JOIN output.aSAH_gp AS aSAH ON bc.patid = aSAH.patid;
+	LEFT OUTER JOIN output.aSAH_apc AS aSAH ON bc.patid = aSAH.patid;
 quit;
 
 
 
 proc SQL;
 SELECT COUNT(*) FROM output.bph_cohort
-WHERE aSAH_gp_dt IS NOT NULL;
+WHERE aSAH_apc_dt IS NOT NULL;
 quit;
-		** 3433 aSAH cases in this cohort;
+		** 3433 aSAH cases in GP data
+		** 1117 aSAH cases in HES APC data ;
 
 * STEP 8: Define baseline date and censor date *;
 
@@ -215,7 +252,7 @@ by patid;
 run;
 
 data output.bph_cohort;
-set bph_genderexc (keep = patid yob regstartdate aSAH_gp_dt baseline_dt censordate reg_age);
+set bph_genderexc (keep = patid yob regstartdate aSAH_apc_dt baseline_dt censordate reg_age);
 by patid;
 if first.patid;
 run;
