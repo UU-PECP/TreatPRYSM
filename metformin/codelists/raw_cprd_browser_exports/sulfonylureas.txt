@@ -1,0 +1,52 @@
+ProdCodeId	DMDCode	TermfromEMIS	ProductName	drugsubstancename	substancestrength	formulation	routeofadministration	bnfcode	DrugIssues
+406841000033114	234011000001108	Daonil 5mg tablets (Sanofi)	Daonil 5mg tablets	Glibenclamide	5.000mg	Tablet/ Oral Tablet	Oral		102842
+462041000033119	13511000001103	Diabetamide 2.5mg tablets (Ashbourne Pharmaceuticals Ltd)	Diabetamide 2.5mg tablets	Glibenclamide	2.500mg	Tablet/ Oral Tablet	Oral		7489
+462141000033115	287811000001101	Diabetamide 5mg tablets (Ashbourne Pharmaceuticals Ltd)	Diabetamide 5mg tablets	Glibenclamide	5.000mg	Tablet/ Oral Tablet	Oral		18505
+557241000033113	233411000001102	Euglucon 2.5mg tablets (Aventis Pharma)	Euglucon 2.5mg tablets	Glibenclamide	2.500mg	Tablet/ Oral Tablet	Oral		13064
+557341000033115	322511000001103	Euglucon 5mg tablets (Sanofi)	Euglucon 5mg tablets	Glibenclamide	5.000mg	Tablet/ Oral Tablet	Oral		43497
+644541000033111	42082711000001102	Glibenclamide 2.5mg tablets	Glibenclamide 2.5mg tablets	Glibenclamide	2.500mg	Tablet/ Oral Tablet	Oral	06010201	625121
+644641000033112	42082811000001105	Glibenclamide 5mg tablets	Glibenclamide 5mg tablets	Glibenclamide	5.000mg	Tablet/ Oral Tablet	Oral	06010201	2521599
+1278041000033114	140711000001103	Semi-Daonil 2.5mg tablets (Sanofi)	Semi-Daonil 2.5mg tablets	Glibenclamide	2.500mg	Tablet/ Oral Tablet	Oral		16790
+5968741000033115	8523711000001107	Glibenclamide 5mg/5ml oral solution	Glibenclamide 5mg/5ml oral solution	Glibenclamide	1.000mg/1.000ml	Oral solution	Oral	06010201	116
+5968841000033113	8523811000001104	Glibenclamide 5mg/5ml oral suspension	Glibenclamide 5mg/5ml oral suspension	Glibenclamide	1.000mg/1.000ml	Oral suspension	Oral	06010201	97
+13122541000033112	37405911000001104	Glibenclamide 600micrograms/ml oral suspension sugar free	Glibenclamide 600micrograms/ml oral suspension sugar free	Glibenclamide	600.000microgram/1.000ml	Oral suspension	Oral	06010201	4
+13122741000033116	37337011000001106	Amglidia 0.6mg/ml oral suspension with 1ml oral syringe (Bioprojet UK Ltd)	Amglidia 0.6mg/ml oral suspension with 1ml oral syringe	Glibenclamide	600.000microgram/1.000ml	Oral suspension	Oral		1
+249441000033114	42081111000001108	Chlorpropamide 100mg tablets	Chlorpropamide 100mg tablets	Chlorpropamide	100.000mg	Tablet/ Oral Tablet	Oral	06010201	38259
+249541000033110	42081211000001102	Chlorpropamide 250mg tablets	Chlorpropamide 250mg tablets	Chlorpropamide	250.000mg	Tablet/ Oral Tablet	Oral	06010201	65281
+1450941000033113	42090611000001109	Tolbutamide 500mg tablets	Tolbutamide 500mg tablets	Tolbutamide	500.000mg	Tablet/ Oral Tablet	Oral	06010201	1346533
+644741000033115	515111000001108	Glibenese 5mg tablets (Pfizer Ltd)	Glibenese 5mg tablets	Glipizide	5.000mg	Tablet/ Oral Tablet	Oral		48268
+644841000033113	42083511000001100	Glipizide 5mg tablets	Glipizide 5mg tablets	Glipizide	5.000mg	Tablet/ Oral Tablet	Oral	06010201	976995
+646541000033116	42083411000001104	Glipizide 2.5mg tablets	Glipizide 2.5mg tablets	Glipizide	2.500mg	Tablet/ Oral Tablet	Oral	06010201	142629
+920141000033112	808711000001104	Minodiab 2.5mg tablets (Pfizer Ltd)	Minodiab 2.5mg tablets	Glipizide	2.500mg	Tablet/ Oral Tablet	Oral		3171
+920241000033117	652411000001107	Minodiab 5mg tablets (Pfizer Ltd)	Minodiab 5mg tablets	Glipizide	5.000mg	Tablet/ Oral Tablet	Oral		8670
+463541000033118	745911000001103	Diamicron 80mg tablets (Servier Laboratories Ltd)	Diamicron 80mg tablets	Gliclazide	80.000mg	Tablet/ Oral Tablet	Oral		364142
+646441000033117	42082911000001100	Gliclazide 80mg tablets	Gliclazide 80mg tablets	Gliclazide	80.000mg	Tablet/ Oral Tablet	Oral	06010201	38348946
+1602941000033117	49111000001103	Diaglyk 80mg tablets (Ashbourne Pharmaceuticals Ltd)	Diaglyk 80mg tablets	Gliclazide	80.000mg	Tablet/ Oral Tablet	Oral		7271
+2289441000033115	38896211000001104	Gliclazide 30mg modified-release tablets	Gliclazide 30mg modified-release tablets	Gliclazide	30.000mg	Modified-release tablet	Oral	06010201	4045993
+2289941000033113	3661311000001107	Diamicron 30mg MR tablets (Servier Laboratories Ltd)	Diamicron 30mg MR tablets	Gliclazide	30.000mg	Modified-release tablet	Oral		198266
+3953041000033113	8524311000001105	Gliclazide 80mg/5ml oral suspension	Gliclazide 80mg/5ml oral suspension	Gliclazide	16.000mg/1.000ml	Oral suspension	Oral	06010201	7718
+4941241000033119	13456711000001106	Nazdol MR 30mg tablets (Krka UK Ltd)	Nazdol MR 30mg tablets	Gliclazide	30.000mg	Modified-release tablet	Oral		1059
+5378141000033117	16536211000001102	Dacadis MR 30mg tablets (Viatris UK Healthcare Ltd)	Dacadis MR 30mg tablets	Gliclazide	30.000mg	Modified-release tablet	Oral		184
+5709741000033116	16702011000001102	Gliclazide 40mg tablets	Gliclazide 40mg tablets	Gliclazide	40.000mg	Tablet/ Oral Tablet	Oral	06010201	5361990
+5709841000033114	16677511000001108	Zicron 40mg tablets (Bristol Laboratories Ltd)	Zicron 40mg tablets	Gliclazide	40.000mg	Tablet/ Oral Tablet	Oral		5172
+5815341000033115	15334511000001109	Edicil MR 30mg tablets (Teva UK Ltd)	Edicil MR 30mg tablets	Gliclazide	30.000mg	Modified-release tablet	Oral		368
+5869241000033114	8524211000001102	Gliclazide 40mg/5ml oral suspension	Gliclazide 40mg/5ml oral suspension	Gliclazide	8.000mg/1.000ml	Oral suspension	Oral	06010201	3761
+8298141000033113	22226111000001104	Gliclazide 60mg modified-release tablets	Gliclazide 60mg modified-release tablets	Gliclazide	60.000mg	Modified-release tablet	Oral	06010201	318038
+8298241000033118	22225011000001109	Laaglyda MR 60mg tablets (Krka UK Ltd)	Laaglyda MR 60mg tablets	Gliclazide	60.000mg	Modified-release tablet	Oral		802
+10043341000033116	28420711000001107	Vamju 30mg modified-release tablets (Advanz Pharma)	Vamju 30mg modified-release tablets	Gliclazide	30.000mg	Modified-release tablet	Oral		3280
+10043441000033110	28420911000001109	Vamju 60mg modified-release tablets (Advanz Pharma)	Vamju 60mg modified-release tablets	Gliclazide	60.000mg	Modified-release tablet	Oral		417
+10701641000033116	30982411000001107	Bilxona 30mg modified-release tablets (Accord-UK Ltd)	Bilxona 30mg modified-release tablets	Gliclazide	30.000mg	Modified-release tablet	Oral		12788
+10701741000033113	37618711000001109	Bilxona 60mg modified-release tablets (Accord-UK Ltd)	Bilxona 60mg modified-release tablets	Gliclazide	60.000mg	Modified-release tablet	Oral		1445
+11918941000033116	33766211000001100	Zicron PR 30mg tablets (Bristol Laboratories Ltd)	Zicron PR 30mg tablets	Gliclazide	30.000mg	Modified-release tablet	Oral		211
+12998941000033116	36914911000001102	Gliclazide 160mg tablets	Gliclazide 160mg tablets	Gliclazide	160.000mg	Tablet/ Oral Tablet	Oral	06010201	28013
+12999041000033113	36910511000001100	Glydex 160mg tablets (Medreich Plc)	Glydex 160mg tablets	Gliclazide	160.000mg	Tablet/ Oral Tablet	Oral		3
+13345341000033117	38018511000001102	Lamzarin 60mg modified-release tablets (Key Pharmaceuticals Ltd)	Lamzarin 60mg modified-release tablets	Gliclazide	60.000mg	Modified-release tablet	Oral		6
+58841000033113	938211000001105	Amaryl 2mg tablets (Zentiva Pharma UK Ltd)	Amaryl 2mg tablets	Glimepiride	2.000mg	Tablet/ Oral Tablet	Oral		22660
+59541000033116	228111000001101	Amaryl 1mg tablets (Zentiva Pharma UK Ltd)	Amaryl 1mg tablets	Glimepiride	1.000mg	Tablet/ Oral Tablet	Oral		22083
+59641000033115	164511000001108	Amaryl 3mg tablets (Zentiva Pharma UK Ltd)	Amaryl 3mg tablets	Glimepiride	3.000mg	Tablet/ Oral Tablet	Oral		10406
+59741000033112	259611000001101	Amaryl 4mg tablets (Zentiva Pharma UK Ltd)	Amaryl 4mg tablets	Glimepiride	4.000mg	Tablet/ Oral Tablet	Oral		20250
+645841000033112	42083111000001109	Glimepiride 2mg tablets	Glimepiride 2mg tablets	Glimepiride	2.000mg	Tablet/ Oral Tablet	Oral	06010201	1223115
+645941000033116	42083011000001108	Glimepiride 1mg tablets	Glimepiride 1mg tablets	Glimepiride	1.000mg	Tablet/ Oral Tablet	Oral	06010201	973939
+646041000033114	42083211000001103	Glimepiride 3mg tablets	Glimepiride 3mg tablets	Glimepiride	3.000mg	Tablet/ Oral Tablet	Oral	06010201	569922
+646141000033113	42083311000001106	Glimepiride 4mg tablets	Glimepiride 4mg tablets	Glimepiride	4.000mg	Tablet/ Oral Tablet	Oral	06010201	1276689
+8125241000033119	21366911000001103	Glimepiride 6mg/5ml oral suspension	Glimepiride 6mg/5ml oral suspension	Glimepiride	1.200mg/1.000ml	Oral suspension	Oral	06010201	50
