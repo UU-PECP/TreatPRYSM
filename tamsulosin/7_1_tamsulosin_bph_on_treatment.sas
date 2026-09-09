@@ -197,7 +197,7 @@ proc sort data = output.bph_treatmentepisodes_fu
 by patid episode_ID;
 run;
 
-data &out;
+data output.bph_ot_all;
 	merge output.IntervalCoverage_OT(in=inI)
 	      fu_keep(in=inO);
 	by patid episode_ID;
@@ -247,13 +247,9 @@ proc sql;
 	group by index_exposure;
 quit;
 
-
-data output.drugfile_subset;
-set output.bphdrugatc_1 (obs = 100000);
-run;
-
 proc sort data = output.bph_ot_all;
 by patid;
 run;
+
 
 
