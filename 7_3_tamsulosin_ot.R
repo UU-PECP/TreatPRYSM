@@ -41,7 +41,7 @@ df <- df %>%
 
   ## ---- drop variables no longer needed ----
   d <- d %>%
-    select(-last_coverage_period_start, -last_coverage_period_end, -aSAH_gp_dt,
+    select(-last_coverage_period_start, -last_coverage_period_end, -aSAH_apc_dt,
            -days_since_last_treatment, -index_exposure)
 
   ## ---- patient-level collapse for crude incidence / KM ----

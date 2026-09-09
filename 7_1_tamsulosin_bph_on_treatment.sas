@@ -189,7 +189,7 @@ proc sort data = output.IntervalCoverage_OT; by patid; run;
 data &out;
 	merge output.IntervalCoverage_OT(in=inI)
 	      output.OverallFollowup_OnT(in=inO
-			keep = patid index_exposure index_date end_of_fu aSAH_gp_dt);
+			keep = patid index_exposure index_date end_of_fu aSAH_apc_dt);
 	by patid;
 	if inI and inO;
 
@@ -210,14 +210,14 @@ data &out;
 		days_since_bridge_start = .;
 
 	/* aSAH flag if event falls within this 30-day window */
-	if not missing(aSAH_gp_dt) and
-	   aSAH_gp_dt >= interval_window_start and
-	   aSAH_gp_dt <= interval_window_end then aSAH_within_interval = 1;
+	if not missing(aSAH_apc_dt) and
+	   aSAH_apc_dt >= interval_window_start and
+	   aSAH_apc_dt <= interval_window_end then aSAH_within_interval = 1;
 	else aSAH_within_interval = 0;
 
 	fu_days = end_of_fu - index_date + 1;
 
-	format index_date end_of_fu interval_window_start interval_window_end aSAH_gp_dt date9.;
+	format index_date end_of_fu interval_window_start interval_window_end aSAH_apc_dt date9.;
 run;
 
 
