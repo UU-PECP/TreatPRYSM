@@ -95,6 +95,7 @@ data output.bph_treatmentepisodes_fu;
 			 keep=patid censordate aSAH_apc_dt);
 	by patid;
 	if inA and inB;
+	earliest_rx_date = episode_start;  /* episode_start is the first Rx date of this AdhereR-bridged episode */
 	index_date = earliest_rx_date;
 	index_exposure = exposure;
 	end_of_fu = '31MAR2025'd;
