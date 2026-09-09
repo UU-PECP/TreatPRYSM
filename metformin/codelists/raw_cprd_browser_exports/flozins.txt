@@ -3,10 +3,6 @@ ProdCodeId	DMDCode	TermfromEMIS	ProductName	drugsubstancename	substancestrength	
 8199441000033112	39689811000001104	Dapagliflozin 10mg tablets	Dapagliflozin 10mg tablets	Dapagliflozin propanediol monohydrate	10.000mg	Tablet/ Oral Tablet	Oral	06010203	6239955
 8199541000033113	21609511000001105	Forxiga 5mg tablets (AstraZeneca UK Ltd)	Forxiga 5mg tablets	Dapagliflozin propanediol monohydrate	5.000mg	Tablet/ Oral Tablet	Oral		18019
 8199641000033114	21609811000001108	Forxiga 10mg tablets (AstraZeneca UK Ltd)	Forxiga 10mg tablets	Dapagliflozin propanediol monohydrate	10.000mg	Tablet/ Oral Tablet	Oral		175349
-9106041000033110	24054611000001100	Dapagliflozin 5mg / Metformin 1g tablets	Dapagliflozin 5mg / Metformin 1g tablets	Dapagliflozin propanediol monohydrate/ Metformin hydrochloride	5.000mg + 1.000gram	Tablet/ Oral Tablet	Oral	06010203	129734
-9106141000033114	24054711000001109	Dapagliflozin 5mg / Metformin 850mg tablets	Dapagliflozin 5mg / Metformin 850mg tablets	Dapagliflozin propanediol monohydrate/ Metformin hydrochloride	5.000mg + 850.000mg	Tablet/ Oral Tablet	Oral	06010203	13630
-9106241000033119	24018511000001102	Xigduo 5mg/1000mg tablets (AstraZeneca UK Ltd)	Xigduo 5mg/1000mg tablets	Dapagliflozin propanediol monohydrate/ Metformin hydrochloride	5.000mg + 1.000gram	Tablet/ Oral Tablet	Oral		5736
-9106341000033112	24018111000001106	Xigduo 5mg/850mg tablets (AstraZeneca UK Ltd)	Xigduo 5mg/850mg tablets	Dapagliflozin propanediol monohydrate/ Metformin hydrochloride	5.000mg + 850.000mg	Tablet/ Oral Tablet	Oral		437
 9110341000033112	39734511000001100	Canagliflozin 100mg tablets	Canagliflozin 100mg tablets	Canagliflozin hemihydrate	100.000mg	Tablet/ Oral Tablet	Oral	06010203	845630
 9110441000033118	24104511000001103	Canagliflozin 300mg tablets	Canagliflozin 300mg tablets	Canagliflozin hemihydrate	300.000mg	Tablet/ Oral Tablet	Oral	06010203	733969
 9110541000033117	24088611000001101	Invokana 100mg tablets (A. Menarini Farmaceutica Internazionale SRL)	Invokana 100mg tablets	Canagliflozin hemihydrate	100.000mg	Tablet/ Oral Tablet	Oral		21487
