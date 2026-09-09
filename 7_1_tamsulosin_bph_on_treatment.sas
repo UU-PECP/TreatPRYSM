@@ -168,6 +168,7 @@ run;
 proc sql;
 	create table output.IntervalCoverage_OT as
 	select i.patid,
+		   i.episode_ID,
 		   i.interval_window_start,
 		   i.interval_window_end,
 		   max(b.bridged_coverage_start) as last_coverage_period_start format=date9.,
@@ -176,21 +177,29 @@ proc sql;
 		 left join output.BridgeCoverage_IndexDrug b
 			on i.patid = b.patid
 			and b.bridged_coverage_start <= i.interval_window_start
-	group by i.patid, i.interval_window_start, i.interval_window_end
-	order by i.patid, i.interval_window_start;
+	group by i.patid, i.episode_ID, i.interval_window_start, i.interval_window_end
+	order by i.patid, i.episode_ID, i.interval_window_start;
 quit;
 
 
 /**************************************************************************/
 /* STEP 2.3: Classify recency (Current/Recent/Past) and flag aSAH        */
 /**************************************************************************/
-proc sort data = output.IntervalCoverage_OT; by patid; run;
+/* output.bph_treatmentepisodes_fu (built in Step 1.1) is one row per     */
+/* treatment episode, so the merge below is keyed on patid AND episode_ID */
+/* - not patid alone - to avoid a many-to-many merge for patients with    */
+/* more than one episode.                                                 */
+proc sort data = output.IntervalCoverage_OT; by patid episode_ID; run;
+
+proc sort data = output.bph_treatmentepisodes_fu
+          out  = fu_keep (keep = patid episode_ID index_exposure index_date end_of_fu aSAH_apc_dt);
+by patid episode_ID;
+run;
 
 data &out;
 	merge output.IntervalCoverage_OT(in=inI)
-	      output.OverallFollowup_OnT(in=inO
-			keep = patid index_exposure index_date end_of_fu aSAH_apc_dt);
-	by patid;
+	      fu_keep(in=inO);
+	by patid episode_ID;
 	if inI and inO;
 
 	if not missing(last_coverage_period_start) then do;
