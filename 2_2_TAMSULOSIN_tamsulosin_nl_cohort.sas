@@ -313,25 +313,43 @@ quit;
 
 
 /**************************************************************************/
-/* STEP 6: Exclude if run-in period is less than 365 days                 */
+/* STEP 6: Exclude if index date is after the end of study period         */
+/**************************************************************************/
+/* Mirrors File 2_1's Step 6 for BPH - guards against index dates that    */
+/* fall outside the study window (01DEC2007-31MAR2025 for NL).            */
+
+data EarliestRxNl_InStudyPeriod;
+set EarliestRxNl_Filtered;
+where indexdate <= '31MAR2025'd;
+run;
+
+/*HOW MANY PATIENTS*/
+proc sql;
+select count(distinct patid) as "Step 6: study period index date"n
+from EarliestRxNl_InStudyPeriod;
+quit;
+
+
+/**************************************************************************/
+/* STEP 7: Exclude if run-in period is less than 365 days                 */
 /**************************************************************************/
 
 PROC SQL;
 create table EarliestRxNl_washout AS
-select * 
-from EarliestRxNl_Filtered
+select *
+from EarliestRxNl_InStudyPeriod
 where indexdate - regstartdate > 365;
 quit;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as "Step 6: Washout exclusions"n
+select count(distinct patid) as "Step 7: Washout exclusions"n
 from EarliestRxNl_washout;
 quit;
 
 
 /**************************************************************************/
-/* STEP 7: Restrict to prescriptions relevant to the stone episode        */
+/* STEP 8: Restrict to prescriptions relevant to the stone episode        */
 /* (index Rx within 30 days on or after the NL baseline date)             */
 /**************************************************************************/
 /* NL-specific step, retained from the earlier NL pipeline - tamsulosin   */
@@ -348,7 +366,7 @@ quit;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as "Step 7: relevant Rx"n
+select count(distinct patid) as "Step 8: relevant Rx"n
 from EarliestRxNl_episode;
 quit;
 
@@ -356,29 +374,29 @@ quit;
 **********;
 /*
 /**************************************************************************/
-/* STEP 8: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx   */
+/* STEP 9: Exclude if subarachnoid hemorrhage (aSAH) occurred before Rx   */
 /* (COMMENTED OUT until HES APC linkage is incorporated )                 */
 /**************************************************************************/
 
 *proc sql;
 *CREATE TABLE EarliestRxNl_Filtered AS
-SELECT d1.* 
+SELECT d1.*
 FROM EarliestRxNl_Filtered as d1
-INNER JOIN output.linked_nl_cohort as d2 
+INNER JOIN output.linked_nl_cohort as d2
 ON d1.patid = d2.patid
 	WHERE d1.aSAH_apc_dt > indexdate or d1.aSAH_apc_dt is NULL;
 *quit;
 
 /*HOW MANY PATIENTS*/
 *proc sql;
-*select count(distinct patid) as "Step 8: prior aSAH"n
-from EarliestRxNl_Filtered 
+*select count(distinct patid) as "Step 9: prior aSAH"n
+from EarliestRxNl_Filtered
 quit;
 
 
 /**************************************************************************/
-/* STEP 9: Retrieving all treatment episodes from patients meeting the    */
-/* exclusion criteria specified in steps 5-7                              */
+/* STEP 10: Retrieving all treatment episodes from patients meeting the   */
+/* exclusion criteria specified in steps 5-8                              */
 /**************************************************************************/
 
 /* FINAL PRODUCT */
@@ -404,7 +422,7 @@ quit;
 %mend;
 
 /**************************************************************************/
-/* STEP 10: Combine all four drugissue files                              */
+/* STEP 11: Combine all four drugissue files                              */
 /**************************************************************************/
 
 * real data input;
