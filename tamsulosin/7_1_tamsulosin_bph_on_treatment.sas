@@ -164,8 +164,10 @@ run;
 /**************************************************************************/
 /* STEP 2.1: Carry most-recent per-Rx dose (mg_value) into each interval  */
 /**************************************************************************/
-/* mg_value is per-prescription in Rx_bph_PostStart; propagate the most    */
-/* recent value forward across intervals (time-varying dose).              */
+/* mg_value is per-prescription in output.all_bph_episodes (the final,    */
+/* HES-linked episode table from 2_1 - not the earlier intermediate       */
+/* Rx_bph_PostStart, which this comment used to name); propagate the      */
+/* most recent value forward across intervals (time-varying dose).        */
 
 proc sort data = output.all_bph_episodes
           out  = mg_sorted(keep=patid issuedate mg_value);
