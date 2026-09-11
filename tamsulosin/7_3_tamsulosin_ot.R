@@ -12,10 +12,10 @@ library(tableone)
 ## ============================================================
 ##  Read the on-treatment interval dataset (from File 7.1 + 7.2)
 ## ============================================================
-df <- read_sas('F://Users//Wyatt003//BPH_nephrolithiasis//Output//bph_ot_bmi_smk_age.sas7bdat')
+df <- read_sas('F://Users//Wyatt003//Tamsulosin//Output//bph_ot_bmi_smk_age.sas7bdat')
 sapply(df, class)
 
-setwd("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Results")
+setwd("F:\\Users\\Wyatt003\\Tamsulosin\\Results")
 ## Exposure coding: 1 = tamsulosin, 2 = alfuzosin, 3 = finasteride
 ## Explicit binary exposure: tamsulosin vs comparator
 df$tamsulosin <- ifelse(df$index_exposure == 1, 1, 0)

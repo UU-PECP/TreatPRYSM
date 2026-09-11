@@ -1,8 +1,8 @@
 
 
 
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
+libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
 
 
 *STEP 1: Define a base cohort by stringing together 4 patient files;

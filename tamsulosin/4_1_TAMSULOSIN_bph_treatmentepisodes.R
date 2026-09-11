@@ -13,7 +13,7 @@ library(janitor)
 
 ### Reading in data
 
-bphdata_all <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\all_bph_episodes.sas7bdat")
+bphdata_all <- read_sas("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\all_bph_episodes.sas7bdat")
 
 bphdata <- bphdata_all %>% distinct(patid, issuedate, exposure, .keep_all = TRUE)
 bphdata %>% group_by(exposure) %>% count()
@@ -99,7 +99,7 @@ treat_epi_all <- bind_rows(treat_episode, .id = "exposure") %>%
 
 ### Save file
 
-write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_treatmentepisodes.csv", row.names = FALSE)
+write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_treatmentepisodes.csv", row.names = FALSE)
 
 #####################################################################
 ### QUICK LOAD FROM HERE ###
@@ -108,7 +108,7 @@ write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_
 
 ### Per protocol: keep only first coverage blocks (prioritizes first record in the case of multi-drug)
  
-treat_epi_all <- read.csv("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_treatmentepisodes.csv") %>%
+treat_epi_all <- read.csv("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_treatmentepisodes.csv") %>%
   mutate(patid = as.character(patid),
          exposure = as.numeric(exposure),
          episode.start = as.Date(episode.start),
@@ -120,9 +120,9 @@ pp_epi <- treat_epi_all %>% group_by(patid) %>%
                              ungroup() %>% mutate(patid = as.character(patid))
 
 ### Combine treatment episode info with base cohort
-bph_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_pp_ps_bmismk.sas7bdat")
+bph_cohort <- read_sas("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_pp_ps_bmismk.sas7bdat")
 bph_cohort <- bph_cohort %>% distinct(patid, .keep_all = TRUE) 
-fu_vars <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_apc_dt, yob))
+fu_vars <- read_sas("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_apc_dt, yob))
 bph_cohort <- left_join(bph_cohort, fu_vars, by = "patid")
 
 bph_pp <- inner_join(pp_epi, bph_cohort, by = "patid")
@@ -145,5 +145,5 @@ bph_pp <- bph_pp %>%
 
 
 
-write.csv(bph_pp, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_perprotocol.csv", row.names = FALSE)
+write.csv(bph_pp, "F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_perprotocol.csv", row.names = FALSE)
 

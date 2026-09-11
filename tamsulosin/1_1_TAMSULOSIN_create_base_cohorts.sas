@@ -9,9 +9,9 @@
 /********************************************/;
 
 
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes";
+libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
+libname codelist "F:\Users\Wyatt003\Tamsulosin\Disorder_Codes";
 options fullstimer;
 
 
@@ -73,7 +73,7 @@ run;
 
 
 data RareDisease_cod;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Tamsulosin\Disorder_Codes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
 	length medcodeid $19 ;
 	input medcodeid :$19. ;
 run;

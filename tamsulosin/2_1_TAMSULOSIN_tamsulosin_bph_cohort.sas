@@ -12,10 +12,10 @@
 /* Set up library references and global options                          */
 /**************************************************************************/
 
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists";
-libname covar "F:\Users\Wyatt003\BPH_nephrolithiasis\ShahabCodes";
+libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
+libname codelist "F:\Users\Wyatt003\Tamsulosin\Drug_Codes";
+libname covar "F:\Users\Wyatt003\Tamsulosin\ShahabCodes";
 
 options fullstimer; /* Display detailed resource usage info in log */
 
@@ -83,7 +83,7 @@ else if f or g then exposure = 3;
 run;
 
 data mg_lookup;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists\Bph_drugs_mgvalue_lookup_table.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Tamsulosin\Drug_Codes\Bph_drugs_mgvalue_lookup_table.txt" dsd dlm='09'x firstobs=2 truncover;
 	length ProdcodeId $19 mg_value 8 ;
 	input ProdcodeId :$19. mg_value;
 run;
@@ -555,21 +555,21 @@ Rename new_prodcode = ProdCodeID ;
 run;
 
 data Tamsulosin_cod ;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists\Tamsulosin_All codes_SA.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Tamsulosin\Drug_Codes\Tamsulosin_All codes_SA.txt" dsd dlm='09'x firstobs=2 truncover;
 	input ProdCodeID;
 	informat 	ProdCodeID 20.;
 	format 		ProdCodeID 20.;
 run;
 
 data Alfuzosin_cod ;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists\Alfuzosin_All codes_SA.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Tamsulosin\Drug_Codes\Alfuzosin_All codes_SA.txt" dsd dlm='09'x firstobs=2 truncover;
 	input ProdCodeID;
 	informat 	ProdCodeID 20.;
 	format 		ProdCodeID 20.;
 run;
 
 data Finasteride_cod ;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Drug_Codelists\Finasteride_All codes_SA.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Tamsulosin\Drug_Codes\Finasteride_All codes_SA.txt" dsd dlm='09'x firstobs=2 truncover;
 	input ProdCodeID;
 	informat 	ProdCodeID 20.;
 	format 		ProdCodeID 20.;

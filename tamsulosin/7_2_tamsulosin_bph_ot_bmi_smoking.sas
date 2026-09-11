@@ -11,7 +11,7 @@
 /*    - Smoking:  output.smoking_all, date = obsdate, flags = smk_cur/ex/non */
 /**************************************************************************/
 
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
 options fullstimer;
 
 %LET inputfile = output.bph_ot_all;

@@ -4,10 +4,10 @@
     September 29, 2021 */
 
 * Set Library Paths ;
-libname data       "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname medcode    "F:\Users\Wyatt003\BPH_nephrolithiasis\BMI";
-libname numunit    "F:\Users\Wyatt003\BPH_nephrolithiasis\BMI";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
+libname data       "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname medcode    "F:\Users\Wyatt003\Tamsulosin\BMI";
+libname numunit    "F:\Users\Wyatt003\Tamsulosin\BMI";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
 
 * Required files: Observtion File, BMI-Weight-HeightMedcodeIDList,BMI-Weight-HeightNumunitIDList; 
 

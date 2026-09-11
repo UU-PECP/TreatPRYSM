@@ -15,8 +15,8 @@
 /*	- moved covariate creation into file 7_2								*/
 /**************************************************************************/
 
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
+libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
 options fullstimer;
 
 /**************************************************************************/
@@ -27,7 +27,7 @@ options fullstimer;
 AdhereR exports a .csv file that then must be imported into SAS */
 
 data output.bph_treatmentepisodes;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Output\bph_treatmentepisodes.csv"
+	infile "F:\Users\Wyatt003\Tamsulosin\Output\bph_treatmentepisodes.csv"
 		dsd dlm=',' firstobs=2 truncover;
 	length exposure 8 patid $19 episode_ID 8
 	       episode_start 8 end_episode_gap_days 8 episode_duration 8 episode_end 8;
