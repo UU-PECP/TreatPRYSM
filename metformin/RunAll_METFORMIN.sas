@@ -9,6 +9,14 @@
 **	separately once their SAS inputs exist.     **
 /************************************************/;
 
+*** Raw extract processing (generic CPRD ingestion, run once) ***;
+
+%include "F:\Users\Wyatt003\metformin\VDI_Scripts\1_0_METFORMIN_large_file_processing.sas";
+
+proc datasets library = work kill nolist;
+run;
+quit;
+
 *** Base cohort (shared by both cohorts) ***;
 
 %include "F:\Users\Wyatt003\metformin\VDI_Scripts\1_1_METFORMIN_create_base_cohort.sas";

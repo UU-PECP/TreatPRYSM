@@ -103,6 +103,7 @@ scripts as well.
 ## Layout
 
 ```
+1_0_METFORMIN_large_file_processing.sas    raw extract ingestion (generic, shared, run once)
 1_1_METFORMIN_create_base_cohort.sas       T2DM population, aSAH linkage, rare disease exclusion (shared)
 
 3_1_METFORMIN_smoking.sas                  GP-derived smoking status (shared, cohort-agnostic)
