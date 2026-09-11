@@ -20,10 +20,17 @@ options fullstimer;
 /* STEP 1: aSAH cases from HES APC (identical ICD-10 I60.x list to        */
 /* tamsulosin/1_1 - the outcome definition does not change between        */
 /* studies)                                                                */
+/*                                                                          */
+/* PLACEHOLDER PATH: tamsulosin/1_1's HES APC infile path points to a      */
+/* specific CPRD data-request folder ("Type_2 25_006098") that isn't a    */
+/* metformin data request, so it was copied over here by mistake when     */
+/* this file was built by mirroring tamsulosin/1_1's structure. Replace   */
+/* with the actual path to metformin's own HES APC hospital diagnosis     */
+/* extract once that data request exists.                                 */
 /**************************************************************************/
 
 data rawdata.hes_hosp;
-	infile "F:\Users\Wyatt003\files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\hes_diagnosis_hosp_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Metformin\Raw_Data\hes_diagnosis_hosp.txt" dsd dlm='09'x firstobs=2 truncover;
 	length patid $19 spno $12 admidate 8 discharged 8 ICD $5 ICDx $1;
 	input patid :$19. spno :$12. admidate :yymmdd10. discharged :yymmdd10. ICD :$5. ICDx :$1.;
 	format admidate discharged date9.;
