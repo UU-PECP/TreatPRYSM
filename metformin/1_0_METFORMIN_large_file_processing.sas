@@ -17,8 +17,8 @@
 **	before 1_1 can build the T2DM base cohort.   **
 /************************************************/;
 
-libname rawdata "F:\Users\Wyatt003\metformin\SAS";
-libname output "F:\Users\Wyatt003\metformin\Output";
+libname rawdata "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname output "F:\Users\Wyatt003\Metformin\Output";
 
 *STEP 1: Define a base cohort by stringing together 4 patient files;
 	*  	The following columns were not found in the contributing tables: crd, deathdate, frd, tod;

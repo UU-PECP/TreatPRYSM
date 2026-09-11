@@ -11,7 +11,7 @@
 
 *** Raw extract processing (generic CPRD ingestion, run once) ***;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\1_0_METFORMIN_large_file_processing.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\1_0_METFORMIN_large_file_processing.sas";
 
 proc datasets library = work kill nolist;
 run;
@@ -19,7 +19,7 @@ quit;
 
 *** Base cohort (shared by both cohorts) ***;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\1_1_METFORMIN_create_base_cohort.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\1_1_METFORMIN_create_base_cohort.sas";
 
 proc datasets library = work kill nolist;
 run;
@@ -28,13 +28,13 @@ quit;
 *** Shared smoking/BMI derivation (run once, before either cohort's        ***;
 *** covariates step - both 3_3 and 3_4 read output.smoking_all/bmi_all)    ***;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\3_1_METFORMIN_smoking.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\3_1_METFORMIN_smoking.sas";
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\3_2_METFORMIN_bmi.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\3_2_METFORMIN_bmi.sas";
 
 proc datasets library = work kill nolist;
 run;
@@ -42,13 +42,13 @@ quit;
 
 *** Cohort A: metformin vs. sulphonylureas (2004-2013) ***;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\2_1_METFORMIN_su_cohort.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\2_1_METFORMIN_su_cohort.sas";
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\3_3_METFORMIN_su_covariates.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\3_3_METFORMIN_su_covariates.sas";
 
 proc datasets library = work kill nolist;
 run;
@@ -56,13 +56,13 @@ quit;
 
 *** Cohort B: metformin vs. SGLT2 inhibitors (2014-2023) ***;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\2_2_METFORMIN_sglt2i_cohort.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\2_2_METFORMIN_sglt2i_cohort.sas";
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\3_4_METFORMIN_sglt2i_covariates.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\3_4_METFORMIN_sglt2i_covariates.sas";
 
 proc datasets library = work kill nolist;
 run;

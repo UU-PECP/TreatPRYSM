@@ -7,8 +7,8 @@
 cohort_label <- "sglt2i"
 comparator_name <- "SGLT2 inhibitors"
 
-ot_sas_path <- "F:\\Users\\Wyatt003\\metformin\\Output\\sglt2i_ot_bmi_smk_age.sas7bdat"
+ot_sas_path <- "F:\\Users\\Wyatt003\\Metformin\\Output\\sglt2i_ot_bmi_smk_age.sas7bdat"
 study_start_date <- "2014-01-01"
-results_dir <- "F:\\Users\\Wyatt003\\metformin\\Results"
+results_dir <- "F:\\Users\\Wyatt003\\Metformin\\Results"
 
-source("F:\\Users\\Wyatt003\\metformin\\VDI_Scripts\\7_3_0_METFORMIN_ot_analysis_body.R")
+source("F:\\Users\\Wyatt003\\Metformin\\VDI_Scripts\\7_3_0_METFORMIN_ot_analysis_body.R")

@@ -6,15 +6,15 @@
 
 cohort_label <- "sglt2i"
 
-episodes_sas_path   <- "F:\\Users\\Wyatt003\\metformin\\Output\\all_sglt2i_episodes.sas7bdat"
-ps_final_sas_path    <- "F:\\Users\\Wyatt003\\metformin\\Output\\sglt2i_ps_final.sas7bdat"
-base_cohort_sas_path <- "F:\\Users\\Wyatt003\\metformin\\Output\\t2dm_cohort.sas7bdat"
+episodes_sas_path   <- "F:\\Users\\Wyatt003\\Metformin\\Output\\all_sglt2i_episodes.sas7bdat"
+ps_final_sas_path    <- "F:\\Users\\Wyatt003\\Metformin\\Output\\sglt2i_ps_final.sas7bdat"
+base_cohort_sas_path <- "F:\\Users\\Wyatt003\\Metformin\\Output\\t2dm_cohort.sas7bdat"
 
 study_start_date <- "2014-01-01"
 study_end_date   <- "2023-03-31"
 followup_window_years <- 10
 
-episodes_csv_path    <- "F:\\Users\\Wyatt003\\metformin\\Output\\sglt2i_treatmentepisodes.csv"
-perprotocol_csv_path <- "F:\\Users\\Wyatt003\\metformin\\Output\\sglt2i_perprotocol.csv"
+episodes_csv_path    <- "F:\\Users\\Wyatt003\\Metformin\\Output\\sglt2i_treatmentepisodes.csv"
+perprotocol_csv_path <- "F:\\Users\\Wyatt003\\Metformin\\Output\\sglt2i_perprotocol.csv"
 
-source("F:\\Users\\Wyatt003\\metformin\\VDI_Scripts\\4_0_METFORMIN_treatmentepisodes_body.R")
+source("F:\\Users\\Wyatt003\\Metformin\\VDI_Scripts\\4_0_METFORMIN_treatmentepisodes_body.R")

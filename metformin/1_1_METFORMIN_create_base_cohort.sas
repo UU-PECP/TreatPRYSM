@@ -10,9 +10,9 @@
 **	date window and drug exposure).             **
 /************************************************/;
 
-libname rawdata "F:\Users\Wyatt003\metformin\SAS";
-libname output "F:\Users\Wyatt003\metformin\Output";
-libname codelist "F:\Users\Wyatt003\metformin\Codelists";
+libname rawdata "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname output "F:\Users\Wyatt003\Metformin\Output";
+libname codelist "F:\Users\Wyatt003\Metformin\Disorder_Codes";
 
 options fullstimer;
 
@@ -57,7 +57,7 @@ quit;
 /**************************************************************************/
 
 data RareDisease_cod;
-	infile "F:\Users\Wyatt003\metformin\Codelists\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Metformin\Disorder_Codes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
 	length medcodeid $19 ;
 	input medcodeid :$19. ;
 run;
@@ -76,7 +76,7 @@ quit;
 /**************************************************************************/
 
 data codelist.t2dm;
-	infile "F:\Users\Wyatt003\metformin\Codelists\diabetes_t2dm.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Metformin\Disorder_Codes\diabetes_t2dm.txt" dsd dlm='09'x firstobs=2 truncover;
 	length medcode $19 readcode $10 readterm $200;
 	input medcode :$19. clinicalevents readcode :$10. readterm :$200.;
 run;

@@ -83,8 +83,17 @@ scripts as well.
 ## Outstanding / not yet resolved
 
 - **Raw data extract**: not yet pulled. Every script uses placeholder VDI
-  paths (`F:\Users\Wyatt003\metformin\...`) to be updated once the extract
-  exists.
+  paths (`F:\Users\Wyatt003\Metformin\...`) to be updated once the extract
+  exists. Folder naming matches the convention `tamsulosin/`'s VDI paths were
+  just renamed to: mother folder `Metformin` (capitalized), `Raw_Data` (raw
+  extract), `Drug_Codes` (our metformin/SU/SGLT2i product codelists +
+  `mg_value_lookup.txt`), `Disorder_Codes` (RareDiseases/T2DM diagnosis
+  codelists, and the shared team comorbidity-flag library used by `3_3_0`) -
+  other subfolders (`Output`, `BMI`, `VDI_Scripts`, `Results`) are unchanged.
+  Note metformin's `Drug_Codes`/`Disorder_Codes` split didn't exist as named
+  folders before this pass - they were both previously lumped into one
+  `Codelists` folder, split apart here to match tamsulosin's separation
+  between drug and diagnosis/comorbidity codelists.
 - **Route of administration / formulation covariate**: the codelists already
   carry a clean `formulation` column, but how to bucket "Powder for oral
   solution" (4 metformin products) against the protocol's four named

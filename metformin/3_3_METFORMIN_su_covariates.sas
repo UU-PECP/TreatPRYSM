@@ -10,4 +10,4 @@
 
 %let cohort_label = su;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\3_3_0_METFORMIN_covariates_body.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\3_3_0_METFORMIN_covariates_body.sas";

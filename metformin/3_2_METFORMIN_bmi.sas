@@ -6,10 +6,10 @@
     using each cohort's own index date. */
 
 * Set Library Paths ;
-libname data       "F:\Users\Wyatt003\metformin\SAS";
-libname medcode    "F:\Users\Wyatt003\metformin\BMI";
-libname numunit    "F:\Users\Wyatt003\metformin\BMI";
-libname output "F:\Users\Wyatt003\metformin\Output";
+libname data       "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname medcode    "F:\Users\Wyatt003\Metformin\BMI";
+libname numunit    "F:\Users\Wyatt003\Metformin\BMI";
+libname output "F:\Users\Wyatt003\Metformin\Output";
 
 * Required files: Observtion File, BMI-Weight-HeightMedcodeIDList,BMI-Weight-HeightNumunitIDList;
 

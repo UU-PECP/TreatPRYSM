@@ -36,8 +36,8 @@
 /*                       comparator episodes, all recurrences)            */
 /**************************************************************************/;
 
-libname rawdata "F:\Users\Wyatt003\metformin\SAS";
-libname output "F:\Users\Wyatt003\metformin\Output";
+libname rawdata "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname output "F:\Users\Wyatt003\Metformin\Output";
 options fullstimer;
 
 /**************************************************************************/

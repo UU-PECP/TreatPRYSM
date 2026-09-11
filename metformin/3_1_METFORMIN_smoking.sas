@@ -6,10 +6,10 @@
 	cohort using each cohort's own index date. */
 
 * Set Libraries;
-libname data       "F:\Users\Wyatt003\metformin\SAS";
-libname medcode    "F:\Users\Wyatt003\metformin\BMI";
-libname numunit    "F:\Users\Wyatt003\metformin\BMI";
-libname output    "F:\Users\Wyatt003\metformin\output";
+libname data       "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname medcode    "F:\Users\Wyatt003\Metformin\BMI";
+libname numunit    "F:\Users\Wyatt003\Metformin\BMI";
+libname output    "F:\Users\Wyatt003\Metformin\output";
 
 * Required files: Observation File, smoking medcodes-units;
 

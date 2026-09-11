@@ -24,9 +24,9 @@
 **	                    / proc format only      **
 /************************************************/;
 
-libname rawdata "F:\Users\Wyatt003\metformin\SAS";
-libname output "F:\Users\Wyatt003\metformin\Output";
-libname codelist "F:\Users\Wyatt003\metformin\Codelists";
+libname rawdata "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname output "F:\Users\Wyatt003\Metformin\Output";
+libname codelist "F:\Users\Wyatt003\Metformin\Drug_Codes";
 
 options fullstimer;
 
@@ -37,7 +37,7 @@ options fullstimer;
 /**************************************************************************/
 
 data metformin_cod;
-	infile "F:\Users\Wyatt003\metformin\Codelists\metformin.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Metformin\Drug_Codes\metformin.txt" dsd dlm='09'x firstobs=2 truncover;
 	length ProdCodeId $19 DMDCode $19 TermfromEMIS $200 ProductName $200
 	       drugsubstancename $100 substancestrength $40 formulation $40
 	       routeofadministration $20 bnfcode $10;
@@ -57,7 +57,7 @@ data comparator_cod;
 run;
 
 data mg_lookup;
-	infile "F:\Users\Wyatt003\metformin\Codelists\mg_value_lookup.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Metformin\Drug_Codes\mg_value_lookup.txt" dsd dlm='09'x firstobs=2 truncover;
 	length ProdCodeId $19;
 	input ProdCodeId :$19. mg_value;
 run;

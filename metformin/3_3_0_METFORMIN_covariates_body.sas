@@ -29,9 +29,9 @@
 **	specific, not relevant to T2DM/metformin).  **
 /************************************************/;
 
-libname rawdata "F:\Users\Wyatt003\metformin\SAS";
-libname output "F:\Users\Wyatt003\metformin\Output";
-libname codelist "F:\Users\Wyatt003\metformin\3_MagdasCodes"; /* shared team codelist library - same as tamsulosin */
+libname rawdata "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname output "F:\Users\Wyatt003\Metformin\Output";
+libname codelist "F:\Users\Wyatt003\Metformin\Disorder_Codes"; /* shared team codelist library - same as tamsulosin */
 
 options fullstimer;
 

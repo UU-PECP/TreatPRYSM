@@ -12,7 +12,7 @@
 %let cohort_label = su;
 %let startdate = '01JAN2004'd;
 %let enddate = '31DEC2013'd;
-%let comparator_file = F:\Users\Wyatt003\metformin\Codelists\sulfonylureas.txt;
+%let comparator_file = F:\Users\Wyatt003\Metformin\Drug_Codes\sulfonylureas.txt;
 %let comparator_name = Sulphonylureas;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\2_0_METFORMIN_exposure_body.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\2_0_METFORMIN_exposure_body.sas";

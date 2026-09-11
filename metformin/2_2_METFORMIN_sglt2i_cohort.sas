@@ -12,7 +12,7 @@
 %let cohort_label = sglt2i;
 %let startdate = '01JAN2014'd;
 %let enddate = '31MAR2023'd;
-%let comparator_file = F:\Users\Wyatt003\metformin\Codelists\flozins.txt;
+%let comparator_file = F:\Users\Wyatt003\Metformin\Drug_Codes\flozins.txt;
 %let comparator_name = SGLT2 inhibitors;
 
-%include "F:\Users\Wyatt003\metformin\VDI_Scripts\2_0_METFORMIN_exposure_body.sas";
+%include "F:\Users\Wyatt003\Metformin\VDI_Scripts\2_0_METFORMIN_exposure_body.sas";
