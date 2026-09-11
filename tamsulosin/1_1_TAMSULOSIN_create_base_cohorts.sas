@@ -36,7 +36,7 @@ quit;
 /* HES Data */
 
 data rawdata.hes_hosp;
-	infile "F:\Users\Wyatt003\files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\hes_diagnosis_hosp_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\HES APC-LSOA linkage files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\hes_diagnosis_hosp_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
 	length patid $19 spno $12 admidate 8 discharged 8 ICD $5 ICDx $1;
 	input patid :$19. spno :$12. admidate :yymmdd10. discharged :yymmdd10. ICD :$5. ICDx :$1.;
 	format admidate discharged date9.;

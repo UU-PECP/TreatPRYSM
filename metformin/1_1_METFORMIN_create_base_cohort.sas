@@ -21,16 +21,18 @@ options fullstimer;
 /* tamsulosin/1_1 - the outcome definition does not change between        */
 /* studies)                                                                */
 /*                                                                          */
-/* PLACEHOLDER PATH: tamsulosin/1_1's HES APC infile path points to a      */
-/* specific CPRD data-request folder ("Type_2 25_006098") that isn't a    */
-/* metformin data request, so it was copied over here by mistake when     */
-/* this file was built by mirroring tamsulosin/1_1's structure. Replace   */
-/* with the actual path to metformin's own HES APC hospital diagnosis     */
-/* extract once that data request exists.                                 */
+/* PLACEHOLDER PATH: HES/LSOA linkage extracts live in a shared team       */
+/* repository (F:\Users\Wyatt003\HES APC-LSOA linkage files\...), not      */
+/* under the per-drug mother folder - see tamsulosin/1_1, whose own HES    */
+/* infile points to that same shared location, under ITS data-request     */
+/* folder ("Type_2 25_006098"). That request number is tamsulosin's, not  */
+/* metformin's, so this can't just reuse it - replace <METFORMIN_REQUEST> */
+/* below with metformin's own data-request folder name once that HES/LSOA */
+/* linkage extract has been requested and exists.                         */
 /**************************************************************************/
 
 data rawdata.hes_hosp;
-	infile "F:\Users\Wyatt003\Metformin\Raw_Data\hes_diagnosis_hosp.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\HES APC-LSOA linkage files\<METFORMIN_REQUEST>\Aurum_linked\Final\hes_diagnosis_hosp_<METFORMIN_REQUEST>.txt" dsd dlm='09'x firstobs=2 truncover;
 	length patid $19 spno $12 admidate 8 discharged 8 ICD $5 ICDx $1;
 	input patid :$19. spno :$12. admidate :yymmdd10. discharged :yymmdd10. ICD :$5. ICDx :$1.;
 	format admidate discharged date9.;
