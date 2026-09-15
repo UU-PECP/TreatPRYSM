@@ -11,8 +11,8 @@ ps_final_sas_path    <- "F:\\Users\\Wyatt003\\Metformin\\Output\\sglt2i_ps_final
 base_cohort_sas_path <- "F:\\Users\\Wyatt003\\Metformin\\Output\\t2dm_cohort.sas7bdat"
 
 study_start_date <- "2014-01-01"
-study_end_date   <- "2023-03-31"
-followup_window_years <- 10
+study_end_date   <- "2025-03-31"
+followup_window_years <- 12
 
 episodes_csv_path    <- "F:\\Users\\Wyatt003\\Metformin\\Output\\sglt2i_treatmentepisodes.csv"
 perprotocol_csv_path <- "F:\\Users\\Wyatt003\\Metformin\\Output\\sglt2i_perprotocol.csv"

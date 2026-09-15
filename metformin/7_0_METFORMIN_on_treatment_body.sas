@@ -29,8 +29,9 @@
 /*                                                                          */
 /*  Required %let parameters from the driver:                             */
 /*    &cohort_label   - e.g. su / sglt2i                                  */
-/*    &study_end       - overall study end for this cohort, e.g.          */
-/*                       '31DEC2013'd / '31MAR2023'd                      */
+/*    &study_end       - overall database end, the same for both cohorts */
+/*                       (not either cohort's own calendar window end):   */
+/*                       '31MAR2025'd                                     */
 /*    &episodes_csv    - path to the FULL (not per-protocol-filtered)     */
 /*                       AdhereR episodes csv from 4_0 (both exposure and */
 /*                       comparator episodes, all recurrences)            */

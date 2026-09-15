@@ -13,8 +13,9 @@ libname output "F:\Users\Wyatt003\Metformin\Output";
 
 * Required files: Observtion File, BMI-Weight-HeightMedcodeIDList,BMI-Weight-HeightNumunitIDList;
 
-* Set value for cutoff date in Observation file - end of the metformin
-  study period (later of the two cohorts, SGLT2i, ends 31MAR2023);
+* Set value for cutoff date in Observation file - overall database end
+  (same raw extract cutoff as tamsulosin, not either cohort's own
+  calendar window end);
 %let cutoff_date="31Mar2025"d;
 %let obs = data.observation_1; 
 %let out = output.bmi_all_1;

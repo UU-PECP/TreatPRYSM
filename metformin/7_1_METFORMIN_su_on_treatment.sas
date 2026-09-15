@@ -9,7 +9,7 @@
 /************************************************/;
 
 %let cohort_label = su;
-%let study_end = '31MAR2023'd;  /* overall database end, not the cohort's 2013 initiation-window end -
+%let study_end = '31MAR2025'd;  /* overall database end, not the cohort's 2013 initiation-window end -
                                     follow-up continues past initiation until censoring/event/study end */
 %let episodes_csv = F:\Users\Wyatt003\Metformin\Output\su_treatmentepisodes.csv;
 

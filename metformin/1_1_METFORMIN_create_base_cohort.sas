@@ -80,13 +80,13 @@ quit;
 
 /**************************************************************************/
 /* STEP 3: T2DM diagnosis codelist                                        */
-/* (metformin/codelists/raw_cprd_browser_exports/diabetes_t2dm.txt,       */
-/* imported here as codelist.t2dm)                                        */
+/* codelist.diabetes is built elsewhere (a shared team library outside    */
+/* this project's access) and is expected to already exist by this point. */
 /**************************************************************************/
 
 
 /* STEP 4: Identify first T2DM diagnosis date for each patient before end of study period */
-/* study period covers both cohorts: 01JAN2004 - 31MAR2023                */
+/* overall database end (same raw extract cutoff as tamsulosin): 31MAR2025 */
 
 proc sql;
 	CREATE TABLE output.t2dm_cases AS
@@ -97,7 +97,7 @@ proc sql;
 	INNER JOIN
 		codelist.diabetes AS t2dm
 		ON cli.medcodeId = t2dm.medcode
-    WHERE cli.obsdate < '31MAR2023'd
+    WHERE cli.obsdate < '31MAR2025'd
 	GROUP BY cli.patid;
 quit;
 
@@ -158,7 +158,7 @@ run;
 
 data output.t2dm_cohort;
 	set output.t2dm_cohort;
-	studyend = '31MAR2023'd;
+	studyend = '31MAR2025'd;
 	censordate = min(regenddate, cprd_ddate, lcd, studyend);
 	format censordate ddmmyy10.;
 run;

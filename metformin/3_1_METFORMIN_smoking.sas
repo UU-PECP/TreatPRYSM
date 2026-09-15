@@ -13,9 +13,10 @@ libname output    "F:\Users\Wyatt003\Metformin\output";
 
 * Required files: Observation File, smoking medcodes-units;
 
-* Set value for cutoff date in Observation file - end of the metformin
-  study period (later of the two cohorts, SGLT2i, ends 31MAR2023);
-%let cutoff_date="31Mar2023"d;
+* Set value for cutoff date in Observation file - overall database end
+  (same raw extract cutoff as tamsulosin, not either cohort's own
+  calendar window end);
+%let cutoff_date="31Mar2025"d;
 
 
 %macro smoking_obs (obs= , out= , cohort=output.t2dm_cohort);

@@ -10,7 +10,7 @@
 /************************************************/;
 
 %let cohort_label = sglt2i;
-%let study_end = '31MAR2023'd;
+%let study_end = '31MAR2025'd;
 %let episodes_csv = F:\Users\Wyatt003\Metformin\Output\sglt2i_treatmentepisodes.csv;
 
 %include "F:\Users\Wyatt003\Metformin\VDI_Scripts\7_0_METFORMIN_on_treatment_body.sas";
