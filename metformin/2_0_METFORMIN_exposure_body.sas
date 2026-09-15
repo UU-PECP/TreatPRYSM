@@ -8,7 +8,8 @@
 **	comparator design). %include this from a    **
 **	per-cohort driver (2_1/2_2) that has already**
 **	set the %let parameters below. Do not run   **
-**	this file directly.                          **
+**	this file directly. It is created to be run **
+**  in files 2_1 and 2_2 						**
 **												**
 **	Required %let parameters from the driver:   **
 **	  &cohort_label   - e.g. su / sglt2i (used  **
@@ -30,13 +31,24 @@ libname codelist "F:\Users\Wyatt003\Metformin\Drug_Codes";
 
 options fullstimer;
 
+
+/* for within file troubleshooting, run this:
+%let cohort_label = su;
+%let startdate = '01JAN2004'd;
+%let enddate = '31DEC2013'd;
+%let comparator_file = F:\Users\Wyatt003\Metformin\Drug_Codes\sulfonylureas.txt;
+%let comparator_name = Sulphonylureas;
+%let out = output.su_drugatc_3;
+%let in = rawdata.drugissue_1; */
+
+
 /**************************************************************************/
 /* STEP 0: Import codelists (ProdCodeId-level exports from the CPRD Aurum */
 /* codebrowser - unlike tamsulosin's ATC-LIKE codelists, these are        */
 /* explicit product lists, so no ATC lookup step is needed).              */
 /**************************************************************************/
 
-data metformin_cod;
+data codelist.metformin_cod;
 	infile "F:\Users\Wyatt003\Metformin\Drug_Codes\metformin.txt" dsd dlm='09'x firstobs=2 truncover;
 	length ProdCodeId $19 DMDCode $19 TermfromEMIS $200 ProductName $200
 	       drugsubstancename $100 substancestrength $40 formulation $40
@@ -46,7 +58,7 @@ data metformin_cod;
 	      routeofadministration :$20. bnfcode :$10. DrugIssues;
 run;
 
-data comparator_cod;
+data codelist.comparator_cod;
 	infile "&comparator_file" dsd dlm='09'x firstobs=2 truncover;
 	length ProdCodeId $19 DMDCode $19 TermfromEMIS $200 ProductName $200
 	       drugsubstancename $100 substancestrength $40 formulation $40
@@ -56,11 +68,13 @@ data comparator_cod;
 	      routeofadministration :$20. bnfcode :$10. DrugIssues;
 run;
 
-data mg_lookup;
+data codelist.mg_value_lookup;
 	infile "F:\Users\Wyatt003\Metformin\Drug_Codes\mg_value_lookup.txt" dsd dlm='09'x firstobs=2 truncover;
-	length ProdCodeId $19;
+	length ProdCodeId $19; 
 	input ProdCodeId :$19. mg_value;
 run;
+
+
 
 %macro drugdata(in =, out=);
 
@@ -86,7 +100,7 @@ proc sql;
 		   r.duration,
 		   r.prodcodeid
 	FROM &in as r
-	inner join metformin_cod as c on strip(c.prodcodeid) = strip(r.prodcodeid);
+	inner join codelist.metformin_cod as c on strip(c.prodcodeid) = strip(r.prodcodeid);
 quit;
 
 proc sql;
@@ -98,7 +112,7 @@ proc sql;
 		   r.duration,
 		   r.prodcodeid
 	FROM &in as r
-	inner join comparator_cod as c on strip(c.prodcodeid) = strip(r.prodcodeid);
+	inner join codelist.comparator_cod as c on strip(c.prodcodeid) = strip(r.prodcodeid);
 quit;
 
 data output.&cohort_label._drugs;
@@ -108,11 +122,13 @@ if a then exposure = 1;  /* metformin */
 else if b then exposure = 2;  /* comparator: &comparator_name */
 run;
 
+
+
 proc sql;
 create table output.&cohort_label._drugs as
 select b.*, m.mg_value
 from output.&cohort_label._drugs as b
-inner join mg_lookup as m on b.prodcodeid = m.prodcodeid;
+inner join codelist.mg_value_lookup as m on b.prodcodeid = m.prodcodeid;
 quit;
 
 /****************************************************************************/
@@ -289,7 +305,7 @@ run;
 
 /*HOW MANY PATIENTS*/
 proc sql;
-select count(distinct patid) as "Step 5: no simultaneous initiators"n
+select count(distinct patid) as "Step 5: no starting both"n
 from New_users_nocombi;
 quit;
 

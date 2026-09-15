@@ -32,7 +32,7 @@ options fullstimer;
 /**************************************************************************/
 
 data rawdata.hes_hosp;
-	infile "F:\Users\Wyatt003\HES APC-LSOA linkage files\<METFORMIN_REQUEST>\Aurum_linked\Final\hes_diagnosis_hosp_<METFORMIN_REQUEST>.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\HES APC-LSOA linkage files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\hes_diagnosis_hosp_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
 	length patid $19 spno $12 admidate 8 discharged 8 ICD $5 ICDx $1;
 	input patid :$19. spno :$12. admidate :yymmdd10. discharged :yymmdd10. ICD :$5. ICDx :$1.;
 	format admidate discharged date9.;
@@ -84,11 +84,6 @@ quit;
 /* imported here as codelist.t2dm)                                        */
 /**************************************************************************/
 
-data codelist.t2dm;
-	infile "F:\Users\Wyatt003\Metformin\Disorder_Codes\diabetes_t2dm.txt" dsd dlm='09'x firstobs=2 truncover;
-	length medcode $19 readcode $10 readterm $200;
-	input medcode :$19. clinicalevents readcode :$10. readterm :$200.;
-run;
 
 /* STEP 4: Identify first T2DM diagnosis date for each patient before end of study period */
 /* study period covers both cohorts: 01JAN2004 - 31MAR2023                */
@@ -100,7 +95,7 @@ proc sql;
 	FROM
 		output.clinical AS cli
 	INNER JOIN
-		codelist.t2dm AS t2dm
+		codelist.diabetes AS t2dm
 		ON cli.medcodeId = t2dm.medcode
     WHERE cli.obsdate < '31MAR2023'd
 	GROUP BY cli.patid;

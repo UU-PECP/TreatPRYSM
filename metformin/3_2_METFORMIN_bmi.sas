@@ -15,7 +15,9 @@ libname output "F:\Users\Wyatt003\Metformin\Output";
 
 * Set value for cutoff date in Observation file - end of the metformin
   study period (later of the two cohorts, SGLT2i, ends 31MAR2023);
-%let cutoff_date="31Mar2023"d;
+%let cutoff_date="31Mar2025"d;
+%let obs = data.observation_1; 
+%let out = output.bmi_all_1;
 
 
 %macro BMI_obs (obs=, out=, cohort=output.t2dm_cohort);
@@ -119,7 +121,8 @@ run;
 
 * Create a subset of records with BMI values that fall withing a given min-max range (I chose minimum and maximum BMI values ever recorded in adults);
 * Drop duplicates i.e. same value from the same day;
-* Updated possible range based on Shahab's CPRD gold BMI script.;
+* Updated possible range based on Shahab's CPRD gold BMI script;
+
 data BMIEntered_WithinRange;
 	set BMIWtHtRecords_cols;
 	if BMI ne .;
