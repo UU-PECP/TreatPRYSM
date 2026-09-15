@@ -18,12 +18,22 @@ libname output    "F:\Users\Wyatt003\Metformin\output";
 %let cutoff_date="31Mar2023"d;
 
 
-%macro smoking_obs (obs= , out= );
+%macro smoking_obs (obs= , out= , cohort=output.t2dm_cohort);
 
 * Read in files;
 * Observation File;
+* Restrict to patids in the base T2DM cohort (built in 1_1) up front, via a  ;
+* hash lookup, so this doesn't sort/scan smoking-code matches for every     ;
+* patient in the raw extract - only patids that could ever reach 2_1/2_2's  ;
+* exposure cohorts (which themselves inner join against &cohort.) survive. ;
 data Observation (drop = pracid enterdate staffid parentobsid obstypeid numrangelow numrangehigh probobsid consid);
+	if _n_ = 1 then do;
+		declare hash cohort_ids(dataset: "&cohort.");
+		cohort_ids.definekey('patid');
+		cohort_ids.definedone();
+	end;
 	set &obs. ;
+	if cohort_ids.check() ne 0 then delete;
 	* Delete records with both missing medcodeid and numunitid values;
 	if numunitid eq . and medcodeid eq '' then delete;
 	* Delete records whose dates are greater than the date of data extraction;

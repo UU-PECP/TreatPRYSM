@@ -18,12 +18,22 @@ libname output "F:\Users\Wyatt003\Metformin\Output";
 %let cutoff_date="31Mar2023"d;
 
 
-%macro BMI_obs (obs=, out=);
+%macro BMI_obs (obs=, out=, cohort=output.t2dm_cohort);
 
 * Read in files;
 * Observation File;
+* Restrict to patids in the base T2DM cohort (built in 1_1) up front, via a  ;
+* hash lookup, so this doesn't sort/scan smoking-code matches for every     ;
+* patient in the raw extract - only patids that could ever reach 2_1/2_2's  ;
+* exposure cohorts (which themselves inner join against &cohort.) survive. ;
 data Observation (drop = pracid enterdate staffid parentobsid obstypeid numrangelow numrangehigh probobsid consid);
+	if _n_ = 1 then do;
+		declare hash cohort_ids(dataset: "&cohort.");
+		cohort_ids.definekey('patid');
+		cohort_ids.definedone();
+	end;
 	set &obs. ;
+	if cohort_ids.check() ne 0 then delete;
 	* Delete records with missing numunitid values;
 	if value eq . or value eq 0 then delete;
 	* Delete records whose dates are greater than the date of data extraction;
@@ -109,7 +119,7 @@ run;
 
 * Create a subset of records with BMI values that fall withing a given min-max range (I chose minimum and maximum BMI values ever recorded in adults);
 * Drop duplicates i.e. same value from the same day;
-* Updated possible range based on Shahab's CPRD gold BMI script.
+* Updated possible range based on Shahab's CPRD gold BMI script.;
 data BMIEntered_WithinRange;
 	set BMIWtHtRecords_cols;
 	if BMI ne .;
