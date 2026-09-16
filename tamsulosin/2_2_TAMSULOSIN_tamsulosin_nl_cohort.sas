@@ -494,7 +494,7 @@ from hes_linkage_patients_nl;
 quit;
 
 proc export data = hes_linkage_patients_nl 
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Codelists\LinkedPatients_tamsulosin_nl.csv"
+outfile = "F:\Users\Wyatt003\Tamsulosin\Results\LinkedPatients_tamsulosin_nl.csv"
 dbms=csv
 replace;
 run;
