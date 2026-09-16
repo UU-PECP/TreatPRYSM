@@ -121,10 +121,6 @@ quit;
     run;
 %mend process_disorders;
 
-/* "diabetes" is included per the metformin protocol's covariate list,   */
-/* but expect it near-constant (~100%) since T2DM diagnosis defines the  */
-/* study population - it's here for fidelity to the protocol, not        */
-/* because it's expected to carry information for the PS model.          */
 data disorders;
     infile datalines delimiter=',';
     input codelist_table : $32. cohort_table : $32. flag_column : $32.;
@@ -138,7 +134,6 @@ data disorders;
 	codelist.copd, output.copd_cohort, copd
 	codelist.stroke, output.stroke_cohort, stroke
 	codelist.rheum_disease, output.rheum_cohort, rheum_disease
-	codelist.diabetes, output.diabetes_cohort, diabetes
 	codelist.heart_failure, output.heart_failure_cohort, heart_failure
 	codelist.hypercholesterolaemia, output.hypercholesterolaemia_cohort, hypercholesterolaemia
 	codelist.hypertension, output.hypertension_cohort, hypertension
@@ -236,7 +231,6 @@ codelist.levomilnacipran|output_levomi_cohort|N06AX28|levomilnacipran
 codelist.milnacipran|output_milnac_cohort|N06AX17|milnacipran
 codelist.venlafaxine|output_venlaf_cohort|N06AX16|venlafaxine
 codelist.antiemetics|output.antiemetics_cohort|A04A%|antiemetics
-codelist.antidiabetics|output.antidiabetics_cohort|A10%|antidiabetics
 ;
 run;
 
@@ -253,7 +247,7 @@ set output.&cohort_label._meds (drop = desuvenlafaxine duloxetine levomilnacipra
 run;
 
 /**************************************************************************/
-/* STEP 4: Merge comorbidities + comedications + smoking + BMI            */
+/* STEP 4: Merge comorbidities + comedications + smoking + BMI + imd      */
 /**************************************************************************/
 
 proc sql;
@@ -364,6 +358,21 @@ create table output.&cohort_label._ps_final as
 select p.*, b.bmi_value
 from output.&cohort_label._cohort_bmi as b
 inner join output.&cohort_label._ps_smk as p on p.patid = b.patid;
+quit;
+
+* incorporate LSOA data;
+
+data rawdata.hes_lsoa;
+	infile "F:\Users\Wyatt003\HES APC-LSOA linkage files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\patient_2019_imd_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
+	length patid $19 pracid $5 imd 8;
+	input patid :$19. pracid :$5. imd;
+run;
+
+proc sql;
+create table output.&cohort_label._ps_final as
+select a.*, b.imd
+from output.&cohort_label._ps_final as a
+left join rawdata.hes_lsoa as b on a.patid = b.patid;
 quit;
 
 ***************************

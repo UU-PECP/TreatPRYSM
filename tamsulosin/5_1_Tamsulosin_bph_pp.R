@@ -63,7 +63,7 @@ vars_cat <- c("acidosis","aids","alcohol","alzheimers_disease",
               "paralysis","peptic_ulcer","pvd","ckd","anticoagulants","antidiabetics","antiemetics",        
               "antihypertensives","dutasteride","lipid_lowering", "nsaids","opioids",                      
               "snri","solifenacin","tadalafil","smk_status")
-vars_num <- c("bmi_value", "age_at_index")
+vars_num <- c("bmi_value", "age_at_index", "imd")
 
 vars <- c(vars_cat,vars_num)
 
@@ -97,7 +97,7 @@ run_smrw <- function(df) {
     hypercholesterolaemia + hypertension + nephrolith + paralysis +
     peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
     antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
-    solifenacin + tadalafil + bmi_value + smk_status
+    solifenacin + tadalafil + bmi_value + smk_status + imd
   
   gc()
   
@@ -240,7 +240,7 @@ ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease
                   hypercholesterolaemia + hypertension + nephrolith + paralysis +
                   peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
                   antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
-                  solifenacin + tadalafil + bmi_value + smk_status, data = d, family = "binomial")
+                  solifenacin + tadalafil + bmi_value + smk_status + imd, data = d, family = "binomial")
 d$pscore <- predict(ps_model, type = "response")
 
 table(d$tamsulosin)
@@ -260,7 +260,7 @@ ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease
                   hypercholesterolaemia + hypertension + nephrolith + paralysis +
                   peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
                   antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
-                  solifenacin + tadalafil + bmi_value + smk_status, data = d, family = "binomial")
+                  solifenacin + tadalafil + bmi_value + smk_status + imd, data = d, family = "binomial")
 d$pscore <- predict(ps_model, type = "response")
 
 table(d$tamsulosin)
@@ -284,7 +284,7 @@ ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease
                   hypercholesterolaemia + hypertension + cirrhosis + nephrolith + paralysis +
                   peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
                   antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
-                  solifenacin + tadalafil + smk_status, data = d, family = "binomial")
+                  solifenacin + tadalafil + smk_status + imd, data = d, family = "binomial")
 d$pscore <- predict(ps_model, type = "response")
 
 imputed_plot <- ggplot(d, aes(x = pscore, fill = factor(tamsulosin))) +
