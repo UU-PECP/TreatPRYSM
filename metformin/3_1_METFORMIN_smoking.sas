@@ -23,10 +23,10 @@ libname output    "F:\Users\Wyatt003\Metformin\output";
 
 * Read in files;
 * Observation File;
-* Restrict to patids in the base T2DM cohort (built in 1_1) up front, via a  ;
-* hash lookup, so this doesn't sort/scan smoking-code matches for every     ;
-* patient in the raw extract - only patids that could ever reach 2_1/2_2's  ;
-* exposure cohorts (which themselves inner join against &cohort.) survive. ;
+/* Restrict to patids in the base T2DM cohort (built in 1_1) up front, via a
+   hash lookup, so this does not sort/scan smoking-code matches for every
+   patient in the raw extract - only patids that could ever reach 2_1/2_2s
+   exposure cohorts (which themselves inner join against &cohort.) survive. */
 data Observation (drop = pracid enterdate staffid parentobsid obstypeid numrangelow numrangehigh probobsid consid);
 	if _n_ = 1 then do;
 		declare hash cohort_ids(dataset: "&cohort.");

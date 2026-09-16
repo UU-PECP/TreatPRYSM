@@ -25,7 +25,7 @@ proc datasets library = work kill nolist;
 run;
 quit;
 
-*** Shared smoking/BMI derivation (run once, before either cohort's        ***;
+/*** Shared smoking/BMI derivation (run once, before either cohort's        ***/
 *** covariates step - both 3_3 and 3_4 read output.smoking_all/bmi_all)    ***;
 
 %include "F:\Users\Wyatt003\Metformin\VDI_Scripts\3_1_METFORMIN_smoking.sas";

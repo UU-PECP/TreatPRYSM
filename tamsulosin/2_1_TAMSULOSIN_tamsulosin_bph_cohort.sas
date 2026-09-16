@@ -179,7 +179,7 @@ TOTAL 494896
 /* bph_dt in base_cohort. */
 /* second step removes identified prevalent users from main dataset */
 
-* Shahab's prevalent user exclusion in base SAS ;
+/* Shahab's prevalent user exclusion in base SAS */
 
 proc sort data = basejoined_set1;
 by patid;
@@ -236,7 +236,7 @@ TOTAL 384263
 /* Finds the minimum (earliest) eventdate among the valid prescriptions.  */
 
 
-* Shahab's Updated Script for multi-drug initiator exclusion ;
+/* Shahab's Updated Script for multi-drug initiator exclusion */
 Proc sort data = output.Rx_bph_PostStart ;
 by patid issuedate ;
 run;
@@ -656,7 +656,7 @@ if first.patid;
 run;
 * 123,829 left after checking against the bast cohort - Set 1 only ;
 
-*** Sage's initial script to identify prevalent users;
+/*** Sage's initial script to identify prevalent users */
 
 proc sql;
 	create table PrevalentUsers as

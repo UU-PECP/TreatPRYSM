@@ -106,7 +106,7 @@ run;
 
 * Create a subset of records with BMI values that fall withing a given min-max range (I chose minimum and maximum BMI values ever recorded in adults);
 * Drop duplicates i.e. same value from the same day;
-* Updated possible range based on Shahab's CPRD gold BMI script.;
+/* Updated possible range based on Shahab's CPRD gold BMI script. */
 data BMIEntered_WithinRange;
 	set BMIWtHtRecords_cols;
 	if BMI ne .;
