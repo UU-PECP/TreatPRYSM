@@ -252,7 +252,7 @@ run;
 
 proc sql;
 create table output.&cohort_label._ps_dismeds as
-select p.*, m.antihypertensives, m.lipid_lowering, m.anticoagulants, m.nsaids, m.opioids, m.antiemetics, m.antidiabetics, m.snri
+select p.*, m.antihypertensives, m.lipid_lowering, m.anticoagulants, m.nsaids, m.opioids, m.antiemetics, m.snri
 from output.&cohort_label._meds as m
 inner join output.&cohort_label._propscor as p
      on    m.patid  = p.patid;
