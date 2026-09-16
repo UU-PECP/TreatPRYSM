@@ -449,7 +449,7 @@ from hes_linkage_patients;
 quit;
 
 proc export data = hes_linkage_patients
-outfile = "C:\Users\Wyatt003\OneDrive - Universiteit Utrecht\Documents\Export\LinkedPatients_metformin_&cohort_label..txt"
+outfile = "F:\Users\Wyatt003\Metformin\Results\LinkedPatients_metformin_&cohort_label..txt"
 dbms=tab
 replace;
 run;
