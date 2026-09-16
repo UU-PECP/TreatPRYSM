@@ -91,9 +91,9 @@ variable.names(df)
 ## descriptive table
 
 vars_cat <- c("acidosis", "aids", "alcohol", "alzheimers_disease",
-              "cancer", "copd", "stroke", "rheum_disease", "diabetes", "heart_failure",
+              "cancer", "copd", "stroke", "rheum_disease", "heart_failure",
               "hypercholesterolaemia", "hypertension", "cirrhosis",
-              "paralysis", "peptic_ulcer", "pvd", "ckd", "anticoagulants", "antidiabetics", "antiemetics",
+              "paralysis", "peptic_ulcer", "pvd", "ckd", "anticoagulants", "antiemetics",
               "antihypertensives", "lipid_lowering", "nsaids", "opioids",
               "snri", "smk_status", "gender")
 vars_num <- c("bmi_value", "age_at_index")
@@ -125,9 +125,9 @@ run_match <- function(df) {
   imputed <- mice(df, m = 5, method = 'pmm', seed = 123, predictorMatrix = pred_matrix)
 
   ps_formula <- metformin ~ age_at_index + gender + acidosis + aids + alzheimers_disease +
-    cancer + copd + stroke + rheum_disease + diabetes + heart_failure +
+    cancer + copd + stroke + rheum_disease + heart_failure +
     hypercholesterolaemia + hypertension + cirrhosis + paralysis +
-    peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
+    peptic_ulcer + pvd + ckd + anticoagulants + antiemetics +
     antihypertensives + lipid_lowering + nsaids + opioids + snri +
     bmi_value + smk_status
 
@@ -160,18 +160,32 @@ run_match <- function(df) {
   })
 
   # ---- Incidence rates ----
-  summary_data <- lapply(matched_complete, function(x) {
+  # ---- Incidence rates, computed once off the first weighted imputation ----
+  summary_data <- lapply(matched_complete, function(x){ 
     x %>%
       group_by(metformin) %>%
       summarise(
-        total_cases           = sum(aSAH * weights),
+        total_patients       = n_distinct(patid),
+        total_cases          = sum(aSAH * weights),
         total_follow_up       = sum(fu_days * weights),
         total_follow_up_years = sum(fu_days * weights) / 365.25,
         .groups = "drop"
       ) %>%
       mutate(incidence_rate = (total_cases / total_follow_up_years) * 1000)
   })
-
+  
+  # Average across the 5 imputations
+  summary_data_pooled <- bind_rows(summary_data, .id = "imputation") %>%
+    group_by(metformin) %>%
+    summarise(
+      total_patients        = mean(total_patients),
+      total_cases           = mean(total_cases),
+      total_follow_up_years = mean(total_follow_up_years),
+      mean_fu_days          = mean(total_follow_up),
+      mean_fu_years         = mean(total_follow_up_years),
+      incidence_rate        = mean(incidence_rate),
+      .groups = "drop"
+    )
   # ---- Cox model on each imputation, pooled ----
   cox_fits_crude <- lapply(matched_complete, function(d) {
     coxph(Surv(fu_days, aSAH) ~ metformin, data = d, weights = weights, cluster = patid)

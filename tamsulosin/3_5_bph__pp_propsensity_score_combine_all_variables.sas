@@ -144,14 +144,24 @@ from output.bph_cohort_bmi as b
 inner join output.bph_pp_ps_smk as p on p.patid = b.patid;
 quit;
 
+* incorporate LSOA data;
+
+data rawdata.hes_lsoa;
+	infile "F:\Users\Wyatt003\HES APC-LSOA linkage files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\patient_2019_imd_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
+	length patid $19 pracid $5 imd 8;
+	input patid :$19. pracid :$5. imd;
+run;
+
+proc sql;
+create table output.bph_pp_ps_bmismk as
+select a.*, b.imd
+from output.bph_pp_ps_bmismk as a
+left join rawdata.hes_lsoa as b on a.patid = b.patid;
+quit;
+
 ***************************
 ***** SANITY CHECKING *****
 ***************************;
-
-/* One pass over every covariate flag, replacing the 30 separate proc freqs. */
-/* Note: liver_failure was dropped (not built in 3_1) and nephrolithiasis    */
-/* renamed to nephrolith to match the flag_column in the disorders list.     */
-/* cirrhosis and alcohol added - both now built in 3_1.                      */
 
 title "Covariate flags - BPH per-protocol propensity score set";
 proc freq data = output.bph_pp_ps_bmismk;
@@ -160,10 +170,12 @@ tables acidosis aids alcohol alzheimers_disease cancer cirrhosis copd stroke
        nephrolith paralysis peptic_ulcer pvd ckd
        antihypertensives lipid_lowering anticoagulants nsaids opioids
        antiemetics antidiabetics snri dutasteride solifenacin tadalafil
-       smk_status / missing;
+       smk_status imd / missing;
 run;
 title;
 
 proc means data = output.bph_pp_ps_bmismk n nmiss mean std min max;
 var bmi_value;
 run;
+
+

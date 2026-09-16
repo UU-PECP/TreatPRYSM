@@ -135,8 +135,7 @@ pp_epi <- treat_epi_all %>% group_by(patid) %>%
 
 cohort <- read_sas(ps_final_sas_path)
 cohort <- cohort %>% distinct(patid, .keep_all = TRUE)
-fu_vars <- read_sas(base_cohort_sas_path, col_select = c(patid, censordate, aSAH_apc_dt, yob))
-cohort <- left_join(cohort, fu_vars, by = "patid")
+
 
 metformin_pp <- inner_join(pp_epi, cohort, by = "patid")
 

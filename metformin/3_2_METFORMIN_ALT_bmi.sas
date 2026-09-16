@@ -5,6 +5,7 @@
     SGLT2i cohorts; the combine step (3_3) merges this in per cohort
     using each cohort's own index date. */
 
+
 * Set Library Paths ;
 libname data       "F:\Users\Wyatt003\Metformin\Raw_Data";
 libname medcode    "F:\Users\Wyatt003\Metformin\BMI";
@@ -13,28 +14,29 @@ libname output "F:\Users\Wyatt003\Metformin\Output";
 
 * Required files: Observtion File, BMI-Weight-HeightMedcodeIDList,BMI-Weight-HeightNumunitIDList;
 
-* Set value for cutoff date in Observation file - overall database end
-  (same raw extract cutoff as tamsulosin, not either cohort's own
-  calendar window end);
+* Set value for cutoff date in Observation file - end of the metformin
+  study period (later of the two cohorts, SGLT2i, ends 31MAR2023);
 %let cutoff_date="31Mar2025"d;
+%let obs = data.observation_1; 
+%let out = output.bmi_all_1;
 
+%let obs = data.observation_2; 
+%let out = output.bmi_all_2;
 
-%macro BMI_obs (obs=, out=, cohort=output.t2dm_cohort);
+%let obs = data.observation_3; 
+%let out = output.bmi_all_3;
+
+%let obs = data.observation_4; 
+%let out = output.bmi_all_4;
+
+data output.bmi_all;
+set output.bmi_all_1 output.bmi_all_2 output.bmi_all_3 output.bmi_all_4;
+run;
 
 * Read in files;
 * Observation File;
-* Restrict to patids in the base T2DM cohort (built in 1_1) up front, via a  ;
-* hash lookup, so this doesn't sort/scan smoking-code matches for every     ;
-* patient in the raw extract - only patids that could ever reach 2_1/2_2's  ;
-* exposure cohorts (which themselves inner join against &cohort.) survive. ;
 data Observation (drop = pracid enterdate staffid parentobsid obstypeid numrangelow numrangehigh probobsid consid);
-	if _n_ = 1 then do;
-		declare hash cohort_ids(dataset: "&cohort.");
-		cohort_ids.definekey('patid');
-		cohort_ids.definedone();
-	end;
 	set &obs. ;
-	if cohort_ids.check() ne 0 then delete;
 	* Delete records with missing numunitid values;
 	if value eq . or value eq 0 then delete;
 	* Delete records whose dates are greater than the date of data extraction;
@@ -284,26 +286,3 @@ data &out (drop = BMI_entered BMI_calc);
 	if BMI_entered eq . and BMI_calc ne . then BMI_final = BMI_calc;
 run;
 
-
-%mend BMI_obs;
-
-%BMI_obs (obs=data.observation_1, out=output.bmi_all_1);
-proc datasets library = work kill nolist;
-run;
-quit;
-%BMI_obs (obs=data.observation_2, out=output.bmi_all_2);
-proc datasets library = work kill nolist;
-run;
-quit;
-%BMI_obs (obs=data.observation_3, out=output.bmi_all_3);
-proc datasets library = work kill nolist;
-run;
-quit;
-%BMI_obs (obs=data.observation_4, out=output.bmi_all_4);
-proc datasets library = work kill nolist;
-run;
-quit;
-
-data output.bmi_all;
-set output.bmi_all_1 output.bmi_all_2 output.bmi_all_3 output.bmi_all_4;
-run;
