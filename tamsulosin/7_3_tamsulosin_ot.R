@@ -8,6 +8,9 @@ library(scales)
 library(survival)
 library(survminer)
 library(tableone)
+library(gtsummary)
+library(flextable)
+library(writexl)
 
 ## ============================================================
 ##  Read the on-treatment interval dataset (from File 7.1 + 7.2)
@@ -68,18 +71,15 @@ df <- df %>%
     ) %>%
     mutate(incidence_rate = (total_cases / as.numeric(total_follow_up_years)) * 1000)
 
-  print(summary_data)
-  sink(paste0("tamsulosin_ot_incidence_", tag, ".txt"))
-  print(summary_data)
-  sink()
+  
+    as.data.frame(summary_data) %>%  writexl::write_xlsx(path = paste0("tamsulosin_ot_incidence_", tag, ".xlsx"))
  
 
   ## ---- crude Cox (patient level) ----
   cox_model <- coxph(Surv(time = fu_days, event = aSAH) ~ tamsulosin,
                      data = individual_data)
-  sink(paste0("tamsulosin_ot_cox_", tag, ".txt"))
-  print(summary(cox_model))
-  sink()
+  tbl_regression(cox_model, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = sink(paste0("tamsulosin_ot_cox_", tag, ".docx")))
+  
 
   ###
   
@@ -196,10 +196,9 @@ df <- df %>%
     robust  = TRUE,
     control = coxph.control(timefix = FALSE, iter.max = 20)
   )
-
-  sink(paste0("tamsulosin_ot_recency_", tag, ".txt"))
-  print(summary(cox_fit))
-  sink()
+  
+  tbl_regression(cox_fit, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_recency_", tag, ".docx"))
+  
 
   invisible(list(incidence = summary_data, cox = cox_fit))
  }
