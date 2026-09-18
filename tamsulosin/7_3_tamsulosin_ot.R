@@ -12,7 +12,7 @@ library(tableone)
 ## ============================================================
 ##  Read the on-treatment interval dataset (from File 7.1 + 7.2)
 ## ============================================================
-df <- read_sas('F://Users//Wyatt003//Tamsulosin//Output//bph_ot_bmi_smk_age.sas7bdat')
+df <- read_sas('F://Users//Wyatt003//Tamsulosin//Output//bph_ot_test.sas7bdat')
 sapply(df, class)
 
 setwd("F:\\Users\\Wyatt003\\Tamsulosin\\Results")
