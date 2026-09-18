@@ -25,10 +25,14 @@ df$tamsulosin <- ifelse(df$index_exposure == 1, 1, 0)
 
 ## On-treatment end of follow-up
 
-df <- df %>% 
-  filter(interval_window_start > lubridate::ymd('2002-10-31')) %>% 
-  filter(interval_window_start < end_of_fu)  %>%
-  mutate(fu_days = ymd(end_of_fu) - ymd(interval_window_start))
+## NOTE: fu_days already comes in from SAS (7_1, Step: end_of_fu - index_date + 1)
+## as a per-patient total follow-up duration - do not overwrite it here with a
+## per-interval quantity, or individual_data's collapse further down will pick
+## up "time remaining from this interval to end of follow-up" instead of total
+## follow-up from index date.
+df <- df %>%
+  filter(interval_window_start > lubridate::ymd('2002-10-31')) %>%
+  filter(interval_window_start < end_of_fu)
 
 
 
