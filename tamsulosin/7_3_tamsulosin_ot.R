@@ -88,6 +88,7 @@ df <- df %>%
    
    gg_crude <- ggsurvplot(
      surv_fit,
+     data = individual_data,
      fun = "event", conf.int = TRUE, censor = FALSE, break.time.by = 365,
      xlab = "Follow-up (days)", ylab = "Cumulative incidence of aSAH",
      legend.labs = c(if (ref_code == 2) "Alfuzosin" else "Finasteride", "Tamsulosin"),
