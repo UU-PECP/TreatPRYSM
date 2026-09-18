@@ -92,7 +92,7 @@ variable.names(df)
 
 vars_cat <- c("acidosis", "aids", "alcohol", "alzheimers_disease",
               "cancer", "copd", "stroke", "rheum_disease", "heart_failure",
-              "hypercholesterolaemia", "hypertension", "cirrhosis",
+              "hypercholesterolaemia", "hypertension", "chronic_liver",
               "paralysis", "peptic_ulcer", "pvd", "ckd", "anticoagulants", "antiemetics",
               "antihypertensives", "lipid_lowering", "nsaids", "opioids",
               "snri", "smk_status", "gender")
@@ -126,7 +126,7 @@ run_match <- function(df) {
 
   ps_formula <- metformin ~ age_at_index + gender + acidosis + aids + alzheimers_disease +
     cancer + copd + stroke + rheum_disease + heart_failure +
-    hypercholesterolaemia + hypertension + cirrhosis + paralysis +
+    hypercholesterolaemia + hypertension + chronic_liver + paralysis +
     peptic_ulcer + pvd + ckd + anticoagulants + antiemetics +
     antihypertensives + lipid_lowering + nsaids + opioids + snri +
     bmi_value + smk_status

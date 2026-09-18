@@ -130,7 +130,7 @@ data disorders;
 	codelist.alcohol, output.alcohol_cohort, alcohol
 	codelist.alzheimers_disease, output.alzheimers_disease_cohort, alzheimers_disease
 	codelist.cancer, output.cancer_cohort, cancer
-	codelist.cirrhosis, output.cirrhosis_cohort, cirrhosis
+	codelist.chronic_liver, output.chronic_liver_cohort, chronic_liver
 	codelist.copd, output.copd_cohort, copd
 	codelist.stroke, output.stroke_cohort, stroke
 	codelist.rheum_disease, output.rheum_cohort, rheum_disease
@@ -381,7 +381,7 @@ quit;
 
 title "Covariate flags - metformin &cohort_label per-protocol propensity score set";
 proc freq data = output.&cohort_label._ps_final;
-tables acidosis aids alcohol alzheimers_disease cancer cirrhosis copd stroke
+tables acidosis aids alcohol alzheimers_disease cancer chronic_liver copd stroke
        rheum_disease diabetes heart_failure hypercholesterolaemia hypertension
        paralysis peptic_ulcer pvd ckd gender
        antihypertensives lipid_lowering anticoagulants nsaids opioids
