@@ -10,6 +10,12 @@ proc datasets library = work kill nolist;
 run;
 quit;
 
+%include "F:\Users\Wyatt003\Tamsulosin\VDI_Scripts\3_1_0_codelist_adapter.sas";
+
+proc datasets library = work kill nolist;
+run;
+quit;
+
 %include "F:\Users\Wyatt003\Tamsulosin\VDI_Scripts\3_1_bph_propensity_score_vars.sas";
 
 proc datasets library = work kill nolist;

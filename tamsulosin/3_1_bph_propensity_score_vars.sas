@@ -110,7 +110,8 @@ data disorders;
 	codelist.alcohol, output.alcohol_cohort, alcohol
 	codelist.alzheimers_disease, output.alzheimers_disease_cohort, alzheimers_disease
 	codelist.cancer, output.cancer_cohort, cancer
-	codelist.cirrhosis, output.cirrhosis_cohort, cirrhosis
+	codelist.chronic_liver, output.chronic_liver_cohort, chronic_liver
+	codelist.alopecia, output.alopecia_cohort, alopecia
 	codelist.copd, output.copd_cohort, copd
 	codelist.stroke, output.stroke_cohort, stroke
 	codelist.rheum_disease, output.rheum_cohort, rheum_disease

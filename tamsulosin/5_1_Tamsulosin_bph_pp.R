@@ -58,10 +58,10 @@ variable.names(df)
 # descriptive table
 
 vars_cat <- c("acidosis","aids","alcohol","alzheimers_disease",
-              "cancer","copd","stroke","rheum_disease","diabetes","heart_failure",        
-              "hypercholesterolaemia","hypertension","cirrhosis","nephrolith",          
-              "paralysis","peptic_ulcer","pvd","ckd","anticoagulants","antidiabetics","antiemetics",        
-              "antihypertensives","dutasteride","lipid_lowering", "nsaids","opioids",                      
+              "cancer","chronic_liver","alopecia","copd","stroke","rheum_disease","diabetes","heart_failure",
+              "hypercholesterolaemia","hypertension","nephrolith",
+              "paralysis","peptic_ulcer","pvd","ckd","anticoagulants","antidiabetics","antiemetics",
+              "antihypertensives","dutasteride","lipid_lowering", "nsaids","opioids",
               "snri","solifenacin","tadalafil","smk_status")
 vars_num <- c("bmi_value", "age_at_index", "imd")
 
@@ -94,7 +94,7 @@ run_smrw <- function(df) {
   
   ps_formula <- tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease +
     cancer + copd + stroke + rheum_disease + diabetes + heart_failure +
-    hypercholesterolaemia + hypertension + nephrolith + paralysis +
+    hypercholesterolaemia + hypertension + chronic_liver + alopecia + nephrolith + paralysis +
     peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
     antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
     solifenacin + tadalafil + bmi_value + smk_status + imd
@@ -241,7 +241,7 @@ d <- complete(imputed, 1)
 
 ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease +
                   cancer + copd + stroke + rheum_disease + diabetes + heart_failure +
-                  hypercholesterolaemia + hypertension + nephrolith + paralysis +
+                  hypercholesterolaemia + hypertension + chronic_liver + alopecia + nephrolith + paralysis +
                   peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
                   antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
                   solifenacin + tadalafil + bmi_value + smk_status + imd, data = d, family = "binomial")
@@ -261,7 +261,7 @@ d <- complete(imputed, 1)
 
 ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease +
                   cancer + copd + stroke + rheum_disease + diabetes + heart_failure +
-                  hypercholesterolaemia + hypertension + nephrolith + paralysis +
+                  hypercholesterolaemia + hypertension + chronic_liver + alopecia + nephrolith + paralysis +
                   peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
                   antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
                   solifenacin + tadalafil + bmi_value + smk_status + imd, data = d, family = "binomial")
@@ -285,7 +285,7 @@ output_ps_plot <- function(df, drug_results, label) {
 
 ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease +
                   cancer + copd + stroke + rheum_disease + diabetes + heart_failure +
-                  hypercholesterolaemia + hypertension + cirrhosis + nephrolith + paralysis +
+                  hypercholesterolaemia + hypertension + chronic_liver + alopecia + nephrolith + paralysis +
                   peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
                   antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
                   solifenacin + tadalafil + smk_status + imd, data = d, family = "binomial")

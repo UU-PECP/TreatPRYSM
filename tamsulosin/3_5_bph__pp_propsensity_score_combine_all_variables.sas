@@ -165,7 +165,7 @@ quit;
 
 title "Covariate flags - BPH per-protocol propensity score set";
 proc freq data = output.bph_pp_ps_bmismk;
-tables acidosis aids alcohol alzheimers_disease cancer cirrhosis copd stroke
+tables acidosis aids alcohol alzheimers_disease cancer chronic_liver alopecia copd stroke
        rheum_disease diabetes heart_failure hypercholesterolaemia hypertension
        nephrolith paralysis peptic_ulcer pvd ckd
        antihypertensives lipid_lowering anticoagulants nsaids opioids
