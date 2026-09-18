@@ -378,18 +378,18 @@ quit;
 /* (COMMENTED OUT until HES APC linkage is incorporated )                 */
 /**************************************************************************/
 
-*proc sql;
-*CREATE TABLE EarliestRxNl_Filtered AS
+proc sql;
+CREATE TABLE EarliestRxNl_Filtered AS
 SELECT d1.*
-FROM EarliestRxNl_Filtered as d1
+FROM EarliestRxNl_episode as d1
 INNER JOIN output.linked_nl_cohort as d2
 ON d1.patid = d2.patid
 	WHERE d1.aSAH_apc_dt > indexdate or d1.aSAH_apc_dt is NULL;
-*quit;
+quit;
 
 /*HOW MANY PATIENTS*/
-*proc sql;
-*select count(distinct patid) as "Step 9: prior aSAH"n
+proc sql;
+select count(distinct patid) as "Step 9: prior aSAH"n
 from EarliestRxNl_Filtered
 quit;
 

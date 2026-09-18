@@ -116,12 +116,14 @@ run_smrw <- function(df) {
       group_by(tamsulosin) %>%
       summarise(
         total_patients       = n_distinct(patid),
-        total_cases          = sum(aSAH * weights),
-        total_follow_up       = sum(fu_days * weights),
-        total_follow_up_years = sum(fu_days * weights) / 365.25,
+        total_cases          = sum(aSAH),
+        total_cases_weighted          = sum(aSAH * weights),
+        total_follow_up_weighted       = sum(fu_days * weights),
+        total_fuy_weighted = sum(fu_days * weights) / 365.25,
+        total_follow_up_years = sum(fu_days) / 365.25,
         .groups = "drop"
       ) %>%
-      mutate(incidence_rate = (total_cases / total_follow_up_years) * 1000)
+      mutate(incidence_rate = (total_cases_weighted / total_fuy_weighted) * 1000)
   })
  
  # Average across the 5 imputations
@@ -130,9 +132,11 @@ run_smrw <- function(df) {
    summarise(
      total_patients        = mean(total_patients),
      total_cases           = mean(total_cases),
+     total_cases_weighted  = mean(total_cases_weighted),
      total_follow_up_years = mean(total_follow_up_years),
      mean_fu_days          = mean(total_follow_up),
      mean_fu_years         = mean(total_follow_up_years),
+     mean_fuy_weighted  = mean(total_fuy_weighted),
      incidence_rate        = mean(incidence_rate),
      .groups = "drop"
    )
