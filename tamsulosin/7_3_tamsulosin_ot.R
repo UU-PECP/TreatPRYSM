@@ -78,7 +78,7 @@ df <- df %>%
   ## ---- crude Cox (patient level) ----
   cox_model <- coxph(Surv(time = fu_days, event = aSAH) ~ tamsulosin,
                      data = individual_data)
-  tbl_regression(cox_model, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = sink(paste0("tamsulosin_ot_cox_", tag, ".docx")))
+  tbl_regression(cox_model, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_cox_", tag, ".docx"))
   
 
   ###
