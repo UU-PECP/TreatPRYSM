@@ -382,10 +382,10 @@ quit;
 title "Covariate flags - metformin &cohort_label per-protocol propensity score set";
 proc freq data = output.&cohort_label._ps_final;
 tables acidosis aids alcohol alzheimers_disease cancer chronic_liver copd stroke
-       rheum_disease diabetes heart_failure hypercholesterolaemia hypertension
+       rheum_disease heart_failure hypercholesterolaemia hypertension
        paralysis peptic_ulcer pvd ckd gender
        antihypertensives lipid_lowering anticoagulants nsaids opioids
-       antiemetics antidiabetics snri
+       antiemetics snri
        smk_status / missing;
 run;
 title;
