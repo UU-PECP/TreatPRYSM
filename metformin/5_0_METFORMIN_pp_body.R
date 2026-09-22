@@ -114,6 +114,61 @@ ft <- flextable(t1export) %>% bold(part = "header") %>% autofit()
 save_as_docx(ft, path = table1_docx_path)
 
 # ---------------------------------------------------------
+# Incidence summary + Cox refit, parameterized by outcome/time column -
+# reused for both the main analysis (fu_days/aSAH) and the sensitivity
+# analysis (fu_days_specific/aSAH_specific) on the SAME matched_complete
+# list, since matching only uses baseline covariates (never the outcome),
+# so there's no need to re-impute/re-trim/re-match for the sensitivity
+# analysis.
+# ---------------------------------------------------------
+summarise_incidence_matched <- function(matched_complete, time_col, event_col) {
+
+  per_imp <- lapply(matched_complete, function(x) {
+    x %>%
+      group_by(metformin) %>%
+      summarise(
+        total_patients        = n_distinct(patid),
+        total_cases           = sum(.data[[event_col]]),
+        total_cases_weighted  = sum(.data[[event_col]] * weights),
+        total_follow_up_years = sum(.data[[time_col]]) / 365.25,
+        total_fuy_weighted    = sum(.data[[time_col]] * weights) / 365.25,
+        .groups = "drop"
+      ) %>%
+      mutate(incidence_rate = (total_cases_weighted / total_fuy_weighted) * 1000)
+  })
+
+  # Average across imputations
+  pooled <- bind_rows(per_imp, .id = "imputation") %>%
+    group_by(metformin) %>%
+    summarise(
+      total_patients         = mean(total_patients),
+      total_cases            = mean(total_cases),          # unweighted case count
+      total_cases_weighted   = mean(total_cases_weighted),  # weighted (match-weight) case count
+      total_follow_up_years  = mean(total_follow_up_years),
+      total_fuy_weighted     = mean(total_fuy_weighted),
+      incidence_rate         = mean(incidence_rate),
+      .groups = "drop"
+    ) %>%
+    # 95% CI on the weighted IR, SE from the weighted case count
+    mutate(
+      ir_lower = incidence_rate * exp(-1.96 / sqrt(total_cases_weighted)),
+      ir_upper = incidence_rate * exp( 1.96 / sqrt(total_cases_weighted))
+    )
+
+  print(pooled)
+  pooled
+}
+
+fit_matched_cox <- function(matched_complete, time_col, event_col) {
+  form <- as.formula(paste0("Surv(", time_col, ", ", event_col, ") ~ metformin"))
+  cox_fits <- lapply(matched_complete, function(d) {
+    coxph(form, data = d, weights = weights, cluster = patid)
+  })
+  cox_fit <- as.mira(cox_fits)
+  list(cox_fit = cox_fit, cox_pool = pool(cox_fit))
+}
+
+# ---------------------------------------------------------
 # PS trimming (asymmetric, 2.5th/97.5th percentile) then
 # 1:1 nearest-neighbour matching without replacement
 # ---------------------------------------------------------
@@ -159,39 +214,16 @@ run_match <- function(df) {
     match.data(matched_list[[i]])
   })
 
-  # ---- Incidence rates ----
-  # ---- Incidence rates, computed once off the first weighted imputation ----
-  summary_data <- lapply(matched_complete, function(x){ 
-    x %>%
-      group_by(metformin) %>%
-      summarise(
-        total_patients       = n_distinct(patid),
-        total_cases          = sum(aSAH * weights),
-        total_follow_up       = sum(fu_days * weights),
-        total_follow_up_years = sum(fu_days * weights) / 365.25,
-        .groups = "drop"
-      ) %>%
-      mutate(incidence_rate = (total_cases / total_follow_up_years) * 1000)
-  })
-  
-  # Average across the 5 imputations
-  summary_data_pooled <- bind_rows(summary_data, .id = "imputation") %>%
-    group_by(metformin) %>%
-    summarise(
-      total_patients        = mean(total_patients),
-      total_cases           = mean(total_cases),
-      total_follow_up_years = mean(total_follow_up_years),
-      mean_fu_days          = mean(total_follow_up),
-      mean_fu_years         = mean(total_follow_up_years),
-      incidence_rate        = mean(incidence_rate),
-      .groups = "drop"
-    )
-  # ---- Cox model on each imputation, pooled ----
-  cox_fits_crude <- lapply(matched_complete, function(d) {
-    coxph(Surv(fu_days, aSAH) ~ metformin, data = d, weights = weights, cluster = patid)
-  })
-  cox_fit_crude <- as.mira(cox_fits_crude)
-  cox_pool_crude <- pool(cox_fit_crude)
+  # ---- Main outcome: aSAH / fu_days ----
+  summary_data <- summarise_incidence_matched(matched_complete, "fu_days", "aSAH")
+  cox_main <- fit_matched_cox(matched_complete, "fu_days", "aSAH")
+
+  # ---- Sensitivity outcome: aSAH_specific / fu_days_specific (excludes  ----
+  # ---- non-specific I60.8/I60.9 codes) - reuses the SAME matched_complete
+  # ---- list, no re-imputation/re-trimming/re-matching needed since
+  # ---- matching only ever used baseline covariates, never the outcome.
+  summary_data_specific <- summarise_incidence_matched(matched_complete, "fu_days_specific", "aSAH_specific")
+  cox_specific <- fit_matched_cox(matched_complete, "fu_days_specific", "aSAH_specific")
 
   cox_fits_adj <- lapply(matched_complete, function(d) {
     coxph(Surv(fu_days, aSAH) ~ metformin + gender + hypertension + ckd +
@@ -202,14 +234,17 @@ run_match <- function(df) {
   cox_pool_adj <- pool(cox_fit_adj)
 
   list(
-    imputed          = imputed,
-    matched_list     = matched_list,
-    matched_complete = matched_complete,
-    summary_data     = summary_data,
-    cox_fit_crude    = cox_fit_crude,
-    cox_pool_crude   = cox_pool_crude,
-    cox_fit_adj      = cox_fit_adj,
-    cox_pool_adj     = cox_pool_adj
+    imputed                 = imputed,
+    matched_list            = matched_list,
+    matched_complete        = matched_complete,
+    summary_data            = summary_data,
+    cox_fit_crude           = cox_main$cox_fit,
+    cox_pool_crude          = cox_main$cox_pool,
+    summary_data_specific   = summary_data_specific,
+    cox_fit_crude_specific  = cox_specific$cox_fit,
+    cox_pool_crude_specific = cox_specific$cox_pool,
+    cox_fit_adj             = cox_fit_adj,
+    cox_pool_adj            = cox_pool_adj
   )
 }
 
@@ -223,6 +258,13 @@ summary(results$cox_pool_adj, conf.int = TRUE, exponentiate = TRUE)
 tbl_regression(results$cox_fit_crude, exponentiate = TRUE) %>%
   as_flex_table() %>%
   save_as_docx(path = cox_docx_path)
+
+## Sensitivity: aSAH redefined to exclude non-specific I60.8/I60.9
+cat("\n--- aSAH_specific sensitivity HR ---\n")
+print(summary(results$cox_pool_crude_specific, conf.int = TRUE, exponentiate = TRUE))
+tbl_regression(results$cox_fit_crude_specific, exponentiate = TRUE) %>%
+  as_flex_table() %>%
+  save_as_docx(path = sub("\\.docx$", "_specific.docx", cox_docx_path))
 
 ## Matched Table 1
 mt1export <- results$matched_complete[[1]] %>%

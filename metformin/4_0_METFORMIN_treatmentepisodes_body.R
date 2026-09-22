@@ -151,4 +151,20 @@ metformin_pp <- metformin_pp %>%
   mutate(aSAH = if_else(!is.na(aSAH_apc_dt) & aSAH_apc_dt <= end_of_fu, 1, 0)) %>%
   mutate(fu_days = ymd(end_of_fu) - ymd(episode.start))
 
+### Sensitivity outcome: aSAH redefined to exclude the non-specific I60.8/
+### I60.9 ICD-10 codes (aSAH_specific_dt, built in 1_1). end_of_fu has to be
+### recalculated too, not just the event flag - a patient whose only
+### qualifying event was I60.8/I60.9 is no longer censored at that date
+### under this definition, so their follow-up can run on to their real
+### censordate/study end instead.
+metformin_pp <- metformin_pp %>%
+  mutate(end_of_fu_specific = lubridate::ymd(episode.end)) %>%
+  mutate(end_of_fu_specific = end_of_fu_specific %>% replace_when(
+    !is.na(censordate) & censordate < end_of_fu_specific & censordate > lubridate::ymd(study_start_date) ~ censordate,
+    !is.na(aSAH_specific_dt) & aSAH_specific_dt < end_of_fu_specific & aSAH_specific_dt > lubridate::ymd(study_start_date) ~ aSAH_specific_dt,
+    lubridate::ymd(study_end_date) < end_of_fu_specific ~ lubridate::ymd(study_end_date)
+  )) %>%
+  mutate(aSAH_specific = if_else(!is.na(aSAH_specific_dt) & aSAH_specific_dt <= end_of_fu_specific, 1, 0)) %>%
+  mutate(fu_days_specific = ymd(end_of_fu_specific) - ymd(episode.start))
+
 write.csv(metformin_pp, perprotocol_csv_path, row.names = FALSE)

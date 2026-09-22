@@ -56,6 +56,30 @@ proc sql;
 quit;
 
 /**************************************************************************/
+/* Sensitivity outcome definition: same aSAH case ascertainment, but      */
+/* excluding the two non-specific ICD-10 codes I60.8 (other subarachnoid  */
+/* haemorrhage) and I60.9 (unspecified). Feeds "aSAH_specific" downstream */
+/* (file 4/5) as an alternative outcome for the sensitivity analysis -    */
+/* everything else (I60 and I60.0-I60.7) still counts.                   */
+/**************************************************************************/
+
+proc sql;
+	CREATE TABLE output.aSAH_apc_specific AS
+	SELECT
+		clin.patid, MIN(clin.admidate) AS aSAH_specific_dt format=ddmmyy10.
+	FROM
+		rawdata.hes_hosp AS clin
+	WHERE clin.ICD IN (
+		"I60", "I60.0", "I60.00", "I60.01", "I60.02",
+		"I60.1", "I60.10", "I60.11", "I60.12",
+		"I60.2", "I60.3", "I60.30", "I60.31",
+		"I60.32", "I60.4", "I60.5", "I60.50",
+		"I60.51", "I60.52", "I60.6", "I60.7"
+)
+	GROUP BY clin.patid;
+quit;
+
+/**************************************************************************/
 /* STEP 2: Rare disease exclusion codelist                                */
 /* (autosomal dominant polycystic kidney disease, Ehlers-Danlos type IV,  */
 /* Marfan, Loeys-Dietz, Majewski) - same exclusion list as tamsulosin,    */
@@ -132,9 +156,11 @@ quit;
 proc SQL;
 	CREATE TABLE output.t2dm_cohort AS
 	SELECT bc.*,
-		   aSAH.aSAH_dt as aSAH_apc_dt
+		   aSAH.aSAH_dt as aSAH_apc_dt,
+		   aSAH_sp.aSAH_specific_dt
 	FROM output.T2DM_initial AS bc
-	LEFT OUTER JOIN output.aSAH_apc AS aSAH ON bc.patid = aSAH.patid;
+	LEFT OUTER JOIN output.aSAH_apc AS aSAH ON bc.patid = aSAH.patid
+	LEFT OUTER JOIN output.aSAH_apc_specific AS aSAH_sp ON bc.patid = aSAH_sp.patid;
 quit;
 
 /* STEP 7: Define baseline date and censor date */
@@ -207,7 +233,7 @@ by patid;
 run;
 
 data output.t2dm_cohort;
-set t2dm_rarediseaseexc (keep = patid gender yob regstartdate aSAH_apc_dt baseline_dt censordate reg_age t2dm_dt);
+set t2dm_rarediseaseexc (keep = patid gender yob regstartdate aSAH_apc_dt aSAH_specific_dt baseline_dt censordate reg_age t2dm_dt);
 by patid;
 if first.patid;
 run;
