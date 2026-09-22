@@ -170,6 +170,7 @@ df <- df %>%
             "aSAH_within_interval",
             "treatment_recency_status",
             "tamsulosin",
+            "dose_category_perday",   # for the dose sensitivity analysis below
             "bmi_value", "smk_cur", "smk_ex", "smk_non",   # time-varying confounders
             "age_at_interval_start")
 
@@ -203,9 +204,38 @@ df <- df %>%
   )
   
   tbl_regression(cox_fit, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_recency_", tag, ".docx"))
-  
 
-  invisible(list(incidence = summary_data, cox = cox_fit))
+  ## ============================================================
+  ##  Secondary model: dose sensitivity (Comparator / <1 dose / >=1 dose
+  ##  per day, 1 dose = 0.4mg), among intervals currently on tamsulosin -
+  ##  per protocol, dose is only meaningful while actively on treatment.
+  ## ============================================================
+  df_dose <- copy(d_filled)[ , `:=`(
+    tstart = as.numeric(interval_window_start - index_date),
+    tstop  = as.numeric(interval_window_end   - index_date),
+    dose_status = fifelse(tamsulosin == 0, "Comparator",
+                    fifelse(treatment_recency_status == "Current" & dose_category_perday == "<1 dose",  "Current-Low",
+                    fifelse(treatment_recency_status == "Current" & dose_category_perday == ">=1 dose", "Current-High", NA_character_)))
+  )][!is.na(dose_status)][ , dose_fac := factor(dose_status, levels = c("Comparator", "Current-Low", "Current-High"))]
+
+  setorder(df_dose, tstop)
+
+  cox_dose <- coxph(
+    Surv(tstart, tstop, aSAH_within_interval) ~
+      relevel(dose_fac, ref = "Comparator") +
+      bmi_value + smk_cur + smk_ex +
+      age_at_interval_start,
+    data    = df_dose,
+    cluster = patid,
+    ties    = "breslow",
+    x = FALSE, y = FALSE, model = FALSE,
+    robust  = TRUE,
+    control = coxph.control(timefix = FALSE, iter.max = 20)
+  )
+
+  tbl_regression(cox_dose, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_dose_", tag, ".docx"))
+
+  invisible(list(incidence = summary_data, cox = cox_fit, cox_dose = cox_dose))
  }
 
 ## ============================================================

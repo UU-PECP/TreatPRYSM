@@ -221,6 +221,33 @@ proc sql;
 	order by i.patid, i.episode_ID, i.interval_window_start;
 quit;
 
+/**************************************************************************/
+/* STEP 2.2b: Dose sensitivity analysis - attach the time-varying dose    */
+/* (mg_value_current, from Step 2.1) to each interval, and derive a       */
+/* doses/day category (1 dose = 0.4mg, the standard tamsulosin dose):     */
+/* "<1 dose" vs ">=1 dose" per day. mg_value_current is missing before a  */
+/* patient's first prescription, so dose_category_perday is left missing */
+/* there too (never meaningful outside "Current" - see 7_3).             */
+/**************************************************************************/
+proc sort data = output.IntervalCoverage_OT; by patid episode_ID interval_window_start; run;
+proc sort data = output.IntervalDose (keep = patid episode_ID interval_window_start mg_value_current)
+          out  = IntervalDose_sorted;
+	by patid episode_ID interval_window_start;
+run;
+
+data output.IntervalCoverage_OT;
+	merge output.IntervalCoverage_OT (in=inC)
+	      IntervalDose_sorted        (in=inD);
+	by patid episode_ID interval_window_start;
+	if inC;
+
+	length dose_category_perday $8;
+	if not missing(mg_value_current) then do;
+		if mg_value_current >= 0.4 then dose_category_perday = ">=1 dose";
+		else dose_category_perday = "<1 dose";
+	end;
+run;
+
 
 /**************************************************************************/
 /* STEP 2.3: Classify recency (Current/Recent/Past) and flag aSAH        */
