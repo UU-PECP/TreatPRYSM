@@ -39,6 +39,7 @@
 
 libname rawdata "F:\Users\Wyatt003\Metformin\Raw_Data";
 libname output "F:\Users\Wyatt003\Metformin\Output";
+libname codelist "F:\Users\Wyatt003\Metformin\Drug_Codes";
 options fullstimer;
 
 /**************************************************************************/
@@ -229,6 +230,63 @@ data output.IntervalDose_&cohort_label;
 run;
 
 /**************************************************************************/
+/* STEP 2.1b: Release pattern (formulation) sensitivity analysis - bucket */
+/* metformin's own raw formulation strings (from codelist.metformin_cod,  */
+/* built in 2_0) into 4 categories, and carry the most recent one forward */
+/* per interval the same way mg_value_current is (Step 2.1). "Powder for  */
+/* oral solution/ Powder" is grouped with "Oral solution" - reconstituted */
+/* before use, consumed as a liquid the same way. The comparator's own    */
+/* formulation is never resolved here - the sensitivity model (7_3_0)    */
+/* collapses all comparator intervals into one "Comparator" reference     */
+/* category regardless, same as the existing dose/duration models.       */
+/**************************************************************************/
+
+data release_pattern_lookup;
+	set codelist.metformin_cod (keep = prodcodeid formulation);
+	length release_pattern $20;
+	if formulation = "Tablet/ Oral Tablet" then release_pattern = "Standard tablet";
+	else if formulation = "Modified-release tablet" then release_pattern = "Slow-release tablet";
+	else if formulation in ("Oral solution", "Powder for oral solution/ Powder") then release_pattern = "Oral solution";
+	else if formulation = "Oral suspension" then release_pattern = "Oral suspension";
+run;
+
+proc sort data = output.all_&cohort_label._episodes (keep=patid issuedate prodcodeid)
+          out  = rx_release;
+	by prodcodeid;
+run;
+
+proc sort data = release_pattern_lookup; by prodcodeid; run;
+
+data rx_release;
+	merge rx_release (in=inRx) release_pattern_lookup (in=inL);
+	by prodcodeid;
+	if inRx;
+run;
+
+proc sort data = rx_release; by patid issuedate; run;
+
+proc sort data = output.ThirtyDayIntervals_&cohort_label
+                 (rename=(interval_window_start = issuedate))
+          out  = int_sorted_release;
+	by patid issuedate;
+run;
+
+data output.IntervalRelease_&cohort_label;
+	merge rx_release(in=inRx)
+	      int_sorted_release(in=inInt);
+	by patid issuedate;
+	retain last_release;
+
+	if inRx  then last_release = release_pattern;
+	if inInt then do;
+		interval_window_start   = issuedate;
+		release_pattern_current = last_release;
+		output;
+	end;
+	drop issuedate last_release;
+run;
+
+/**************************************************************************/
 /* STEP 2.2: Last coverage block starting on/before interval_window_start */
 /**************************************************************************/
 
@@ -263,6 +321,7 @@ quit;
 data output.&cohort_label._ot_all;
 	merge output.IntervalCoverage_&cohort_label(in=inI)
 	      output.IntervalDose_&cohort_label(in=inD keep=patid interval_window_start mg_value_current)
+	      output.IntervalRelease_&cohort_label(in=inR keep=patid interval_window_start release_pattern_current)
 	      fu_onerow(in=inO keep = patid index_exposure index_date end_of_fu aSAH_apc_dt dose_category duration_category);
 	by patid;
 	if inI and inO;

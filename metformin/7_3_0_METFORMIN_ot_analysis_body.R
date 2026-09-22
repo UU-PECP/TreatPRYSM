@@ -188,6 +188,7 @@ run_ot_analysis <- function(df) {
             "interval_window_start", "interval_window_end", "index_date",
             "aSAH_within_interval",
             "exposure_status", "dose_category", "duration_category",
+            "release_pattern_current",
             "bmi_value", "smk_cur", "smk_ex", "smk_non",
             "gender", "age_at_interval_start")
 
@@ -284,8 +285,46 @@ run_ot_analysis <- function(df) {
   print(summary(cox_duration))
   sink()
 
+  ## ============================================================
+  ##  Secondary model: release pattern / formulation (Comparator /
+  ##  Standard tablet / Slow-release tablet / Oral solution / Oral
+  ##  suspension), among intervals currently on metformin - the
+  ##  comparator's own formulation is never resolved, so every
+  ##  comparator interval collapses into "Comparator" regardless,
+  ##  same as the dose/duration models above.
+  ## ============================================================
+  d_release <- d_filled %>%
+    mutate(release_status = case_when(
+      metformin == 0 ~ "Comparator",
+      metformin == 1 & treatment_recency_status == "Current" & release_pattern_current == "Standard tablet"     ~ "Current-StandardTablet",
+      metformin == 1 & treatment_recency_status == "Current" & release_pattern_current == "Slow-release tablet" ~ "Current-SlowRelease",
+      metformin == 1 & treatment_recency_status == "Current" & release_pattern_current == "Oral solution"       ~ "Current-OralSolution",
+      metformin == 1 & treatment_recency_status == "Current" & release_pattern_current == "Oral suspension"     ~ "Current-OralSuspension",
+      TRUE ~ NA_character_
+    )) %>%
+    filter(!is.na(release_status))
+
+  df_release <- copy(setDT(d_release[, c(keep, "index_date", "interval_window_start", "interval_window_end", "release_status")]))[, `:=`(
+    tstart = as.numeric(interval_window_start - index_date),
+    tstop  = as.numeric(interval_window_end - index_date),
+    release_fac = factor(release_status, levels = c("Comparator", "Current-StandardTablet", "Current-SlowRelease", "Current-OralSolution", "Current-OralSuspension"))
+  )]
+  setorder(df_release, tstop)
+
+  cox_release <- coxph(
+    Surv(tstart, tstop, aSAH_within_interval) ~
+      relevel(release_fac, ref = "Comparator") +
+      gender + bmi_value + smk_cur + smk_ex + age_at_interval_start,
+    data = df_release, cluster = patid, ties = "breslow",
+    robust = TRUE, control = coxph.control(timefix = FALSE, iter.max = 20)
+  )
+  sink(paste0("metformin_", cohort_label, "_ot_release.txt"))
+  print(summary(cox_release))
+  sink()
+
   invisible(list(incidence = summary_data, cox_recency = cox_fit,
-                 cox_dose = cox_dose, cox_duration = cox_duration))
+                 cox_dose = cox_dose, cox_duration = cox_duration,
+                 cox_release = cox_release))
 }
 
 results <- run_ot_analysis(df)
