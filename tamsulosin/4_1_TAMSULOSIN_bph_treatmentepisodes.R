@@ -122,7 +122,7 @@ pp_epi <- treat_epi_all %>% group_by(patid) %>%
 ### Combine treatment episode info with base cohort
 bph_cohort <- read_sas("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_pp_ps_bmismk.sas7bdat")
 bph_cohort <- bph_cohort %>% distinct(patid, .keep_all = TRUE) 
-fu_vars <- read_sas("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_apc_dt, yob))
+fu_vars <- read_sas("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_cohort.sas7bdat", col_select = c(patid, censordate, aSAH_apc_dt, aSAH_specific_dt, yob))
 bph_cohort <- left_join(bph_cohort, fu_vars, by = "patid")
 
 bph_pp <- inner_join(pp_epi, bph_cohort, by = "patid")
@@ -140,7 +140,23 @@ bph_pp <- bph_pp %>%
     lubridate::ymd('2025-03-31') < end_of_fu ~ lubridate::ymd('2025-03-31')
   )) %>% 
   mutate(aSAH = if_else(!is.na(aSAH_apc_dt) & aSAH_apc_dt <= end_of_fu, 1, 0))%>%
-  mutate(fu_days = ymd(end_of_fu) - ymd(episode.start)) 
+  mutate(fu_days = ymd(end_of_fu) - ymd(episode.start))
+
+### Sensitivity outcome: aSAH redefined to exclude the non-specific I60.8/
+### I60.9 ICD-10 codes (aSAH_specific_dt, built in 1_1). end_of_fu has to be
+### recalculated too, not just the event flag - a patient whose only
+### qualifying event was I60.8/I60.9 is no longer censored at that date
+### under this definition, so their follow-up can run on to their real
+### censordate/study end instead.
+bph_pp <- bph_pp %>%
+  mutate(end_of_fu_specific = lubridate::ymd(episode.end)) %>%
+  mutate(end_of_fu_specific = end_of_fu_specific %>% replace_when(
+    !is.na(censordate) & censordate < end_of_fu_specific & censordate > lubridate::ymd('2002-10-31') ~ censordate,
+    !is.na(aSAH_specific_dt) & aSAH_specific_dt < end_of_fu_specific & aSAH_specific_dt > lubridate::ymd('2002-10-31') ~ aSAH_specific_dt,
+    lubridate::ymd('2025-03-31') < end_of_fu_specific ~ lubridate::ymd('2025-03-31')
+  )) %>%
+  mutate(aSAH_specific = if_else(!is.na(aSAH_specific_dt) & aSAH_specific_dt <= end_of_fu_specific, 1, 0)) %>%
+  mutate(fu_days_specific = ymd(end_of_fu_specific) - ymd(episode.start))
   
 
 

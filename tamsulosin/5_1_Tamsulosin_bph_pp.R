@@ -81,78 +81,106 @@ ft <- flextable(t1export) %>% bold(part = "header") %>% autofit()
 save_as_docx(ft, path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\tamsulosin_pp_table1.docx")
 
 # ---------------------------------------------------------
+# Incidence summary + Cox refit, parameterized by outcome/time column -
+# reused for both the main analysis (fu_days/aSAH) and the sensitivity
+# analysis (fu_days_specific/aSAH_specific) on the SAME weighted_list, so
+# the expensive imputation + weighting + trimming only happens once.
+# ---------------------------------------------------------
+summarise_incidence <- function(weighted_list, time_col, event_col) {
+
+  per_imp <- lapply(complete(weighted_list, "all"), function(x) {
+    x %>%
+      group_by(tamsulosin) %>%
+      summarise(
+        total_patients           = n_distinct(patid),
+        total_cases              = sum(.data[[event_col]]),
+        total_cases_weighted     = sum(.data[[event_col]] * weights),
+        total_follow_up_weighted = sum(.data[[time_col]] * weights),
+        total_fuy_weighted       = sum(.data[[time_col]] * weights) / 365.25,
+        total_follow_up_years    = sum(.data[[time_col]]) / 365.25,
+        .groups = "drop"
+      ) %>%
+      mutate(incidence_rate = (total_cases_weighted / total_fuy_weighted) * 1000)
+  })
+
+  # Average across imputations
+  pooled <- bind_rows(per_imp, .id = "imputation") %>%
+    group_by(tamsulosin) %>%
+    summarise(
+      total_patients         = mean(total_patients),
+      total_cases            = mean(total_cases),          # unweighted case count
+      total_cases_weighted   = mean(total_cases_weighted),  # weighted case count
+      total_follow_up_years  = mean(total_follow_up_years),
+      total_fuy_weighted     = mean(total_fuy_weighted),
+      incidence_rate         = mean(incidence_rate),
+      .groups = "drop"
+    ) %>%
+    # 95% CI on the weighted IR, SE from the weighted case count
+    # (IR * exp(+-1.96/sqrt(weighted cases)))
+    mutate(
+      ir_lower = incidence_rate * exp(-1.96 / sqrt(total_cases_weighted)),
+      ir_upper = incidence_rate * exp( 1.96 / sqrt(total_cases_weighted))
+    )
+
+  print(pooled)
+  pooled
+}
+
+fit_weighted_cox <- function(weighted_list, time_col, event_col) {
+  form <- as.formula(paste0("Surv(", time_col, ", ", event_col, ") ~ tamsulosin"))
+  cox_fit <- with(weighted_list, svycoxph(form), cluster = TRUE)
+  list(cox_fit = cox_fit, cox_pool = pool(cox_fit))
+}
+
+# ---------------------------------------------------------
 # SMR Weighting setup
 # ---------------------------------------------------------
-run_smrw <- function(df) { 
-  
+run_smrw <- function(df) {
+
   pred_matrix <- make.predictorMatrix(df)
   pred_matrix[, !( dimnames(pred_matrix)[[2]]  %in%  c(vars_cat, "age_at_index") )] <- 0
-  
-  
+
+
   imputed <- mice(df, m = 3, method = 'pmm', seed = 123, predictorMatrix = pred_matrix)
   comp_list <- complete(imputed, "all")
-  
+
   ps_formula <- tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease +
     cancer + copd + stroke + rheum_disease + diabetes + heart_failure +
     hypercholesterolaemia + hypertension + chronic_liver + alopecia + nephrolith + paralysis +
     peptic_ulcer + pvd + ckd + anticoagulants + antidiabetics + antiemetics +
     antihypertensives + dutasteride + lipid_lowering + nsaids + opioids + snri +
     solifenacin + tadalafil + bmi_value + smk_status + imd
-  
+
   gc()
-  
+
  weighted_list <- weightthem(ps_formula,
                             datasets    = imputed,
                             approach    = "within",
                             method      = "glm",
                             estimand    = "ATT"
   )
-  
+
  weighted_list <- trim(weighted_list, at = 0.975)
-  
-  # ---- Incidence rates, computed once off the first weighted imputation ----
-  summary_data <- lapply(complete(weighted_list, "all"), function(x){ 
-    x %>%
-      group_by(tamsulosin) %>%
-      summarise(
-        total_patients       = n_distinct(patid),
-        total_cases          = sum(aSAH),
-        total_cases_weighted          = sum(aSAH * weights),
-        total_follow_up_weighted       = sum(fu_days * weights),
-        total_fuy_weighted = sum(fu_days * weights) / 365.25,
-        total_follow_up_years = sum(fu_days) / 365.25,
-        .groups = "drop"
-      ) %>%
-      mutate(incidence_rate = (total_cases_weighted / total_fuy_weighted) * 1000)
-  })
- 
- # Average across the 5 imputations
- summary_data_pooled <- bind_rows(summary_data, .id = "imputation") %>%
-   group_by(tamsulosin) %>%
-   summarise(
-     total_patients        = mean(total_patients),
-     total_cases           = mean(total_cases),
-     total_cases_weighted  = mean(total_cases_weighted),
-     total_follow_up_years = mean(total_follow_up_years),
-     mean_fu_days          = mean(total_follow_up),
-     mean_fu_years         = mean(total_follow_up_years),
-     mean_fuy_weighted  = mean(total_fuy_weighted),
-     incidence_rate        = mean(incidence_rate),
-     .groups = "drop"
-   )
-  
-  # ---- Cox model on each imputation, pooled ----
-  cox_fit_crude <- with(weighted_list, 
-                         svycoxph(Surv(fu_days, aSAH) ~ tamsulosin), cluster = TRUE)
-  
-  
-  cox_pool_crude <- pool(cox_fit_crude)
-  
+
+  # ---- Main outcome: aSAH / fu_days ----
+  summary_data <- summarise_incidence(weighted_list, "fu_days", "aSAH")
+  cox_main <- fit_weighted_cox(weighted_list, "fu_days", "aSAH")
+
+  # ---- Sensitivity outcome: aSAH_specific / fu_days_specific (excludes  ----
+  # ---- non-specific I60.8/I60.9 codes) - reuses the SAME weighted_list, ----
+  # ---- no re-imputation/re-weighting needed since PS weights only      ----
+  # ---- depend on baseline covariates, not the outcome.                 ----
+  summary_data_specific <- summarise_incidence(weighted_list, "fu_days_specific", "aSAH_specific")
+  cox_specific <- fit_weighted_cox(weighted_list, "fu_days_specific", "aSAH_specific")
+
   list(
-    weighted_list   = weighted_list,
-    summary_data   = summary_data_pooled,
-    cox_fit_crude  = cox_fit_crude,
-    cox_pool_crude = cox_pool_crude,
+    weighted_list           = weighted_list,
+    summary_data            = summary_data,
+    cox_fit_crude           = cox_main$cox_fit,
+    cox_pool_crude          = cox_main$cox_pool,
+    summary_data_specific   = summary_data_specific,
+    cox_fit_crude_specific  = cox_specific$cox_fit,
+    cox_pool_crude_specific = cox_specific$cox_pool,
     imputed = imputed
   )
 }
@@ -180,6 +208,12 @@ fin_results_smrw <- run_smrw(fin_ref)
 tbl_regression(alf_results_smrw$cox_fit_crude, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\alfuzosin_pp_cox_smrw.docx")
 as.data.frame(alf_results_smrw$summary_data) %>%  writexl::write_xlsx(path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\alfuzosin_pp_inc_smrw.xlsx")
 
+# Sensitivity: aSAH redefined to exclude non-specific I60.8/I60.9
+cat("\n--- Alfuzosin: aSAH_specific sensitivity HR ---\n")
+print(summary(alf_results_smrw$cox_pool_crude_specific, exponentiate = TRUE))
+tbl_regression(alf_results_smrw$cox_fit_crude_specific, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\alfuzosin_pp_cox_smrw_specific.docx")
+as.data.frame(alf_results_smrw$summary_data_specific) %>%  writexl::write_xlsx(path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\alfuzosin_pp_inc_smrw_specific.xlsx")
+
 
 
 
@@ -188,6 +222,12 @@ as.data.frame(alf_results_smrw$summary_data) %>%  writexl::write_xlsx(path = "F:
 
 tbl_regression(fin_results_smrw$cox_fit_crude, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\finasteride_pp_cox_smrw.docx")
 as.data.frame(fin_results_smrw$summary_data) %>%  writexl::write_xlsx(path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\finasteride_pp_inc_smrw.xlsx")
+
+# Sensitivity: aSAH redefined to exclude non-specific I60.8/I60.9
+cat("\n--- Finasteride: aSAH_specific sensitivity HR ---\n")
+print(summary(fin_results_smrw$cox_pool_crude_specific, exponentiate = TRUE))
+tbl_regression(fin_results_smrw$cox_fit_crude_specific, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\finasteride_pp_cox_smrw_specific.docx")
+as.data.frame(fin_results_smrw$summary_data_specific) %>%  writexl::write_xlsx(path = "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\finasteride_pp_inc_smrw_specific.xlsx")
 
 
 
