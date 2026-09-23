@@ -126,9 +126,14 @@ summarise_incidence <- function(weighted_list, time_col, event_col) {
   pooled
 }
 
-fit_weighted_cox <- function(weighted_list, time_col, event_col) {
-  form <- as.formula(paste0("Surv(", time_col, ", ", event_col, ") ~ tamsulosin"))
-  cox_fit <- with(weighted_list, svycoxph(form), cluster = TRUE)
+# with() for svyimputationList-style objects doesn't resolve local
+# variables the way a normal R closure would - it evaluates the
+# expression using an enclosing frame that skips right over this
+# function's own locals, so a formula built here and referenced by name
+# (e.g. svycoxph(form)) fails with "object 'form' not found". Pass the
+# already-fitted with() result in instead of trying to parameterize the
+# with() call itself.
+wrap_pooled_cox <- function(cox_fit) {
   list(cox_fit = cox_fit, cox_pool = pool(cox_fit))
 }
 
@@ -164,14 +169,16 @@ run_smrw <- function(df) {
 
   # ---- Main outcome: aSAH / fu_days ----
   summary_data <- summarise_incidence(weighted_list, "fu_days", "aSAH")
-  cox_main <- fit_weighted_cox(weighted_list, "fu_days", "aSAH")
+  cox_fit_main <- with(weighted_list, svycoxph(Surv(fu_days, aSAH) ~ tamsulosin), cluster = TRUE)
+  cox_main <- wrap_pooled_cox(cox_fit_main)
 
   # ---- Sensitivity outcome: aSAH_specific / fu_days_specific (excludes  ----
   # ---- non-specific I60.8/I60.9 codes) - reuses the SAME weighted_list, ----
   # ---- no re-imputation/re-weighting needed since PS weights only      ----
   # ---- depend on baseline covariates, not the outcome.                 ----
   summary_data_specific <- summarise_incidence(weighted_list, "fu_days_specific", "aSAH_specific")
-  cox_specific <- fit_weighted_cox(weighted_list, "fu_days_specific", "aSAH_specific")
+  cox_fit_specific <- with(weighted_list, svycoxph(Surv(fu_days_specific, aSAH_specific) ~ tamsulosin), cluster = TRUE)
+  cox_specific <- wrap_pooled_cox(cox_fit_specific)
 
   list(
     weighted_list           = weighted_list,
