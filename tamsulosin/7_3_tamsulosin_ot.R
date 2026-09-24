@@ -108,61 +108,6 @@ df <- df %>%
           plot = gg_crude$plot, width = 8, height = 6, dpi = 300)
 
   ## ============================================================
-  ##  Time-varying confounder plot: BMI over time
-  ##  (replaces Jos's blood-pressure plot; smoking is categorical
-  ##   so it's carried into the model rather than plotted here)
-  ## ============================================================
-
-  ## fill missing BMI by per-patient median (keep NA if all missing)
-  d_filled <- d %>%
-    group_by(patid) %>%
-    mutate(across(bmi_value,
-                  ~ ifelse(is.na(.x),
-                           ifelse(is.nan(median(.x, na.rm = TRUE)), NA,
-                                  median(.x, na.rm = TRUE)),
-                           .x))) %>%
-    ungroup()
-
-  ## ever-aSAH flag (patient level)
-  d_filled <- d_filled %>%
-    group_by(patid) %>%
-    mutate(ever_aSAH = any(aSAH_within_interval == 1)) %>%
-    ungroup()
-
-  bmi_vars <- c("patid", "interval_window_start", "tamsulosin", "index_date",
-                "interval_window_end", "ever_aSAH", "bmi_value")
-  df_bmi <- d_filled %>% select(all_of(bmi_vars)) %>%
-    mutate(
-      t_months_start = as.numeric(interval_window_start - index_date) / 30,
-      tamsulosin_lbl = factor(tamsulosin, labels = c("No", "Yes")),
-      outcome_lbl    = if_else(ever_aSAH, "Ever aSAH", "No aSAH")
-    )
-
-  setDT(df_bmi)
-  df_int <- df_bmi[ , .(bmi_value = mean(bmi_value, na.rm = TRUE)),
-                    by = .(patid, t_months_start, tamsulosin_lbl, outcome_lbl)]
-
-  median_hilow <- function(x, ...) {
-    qs <- quantile(x, c(.025, .5, .975), na.rm = TRUE)
-    names(qs) <- c("ymin", "y", "ymax"); qs
-  }
-
-  bmi_plot <- ggplot(df_int,
-                     aes(x = t_months_start, y = bmi_value,
-                         colour = tamsulosin_lbl,
-                         group = tamsulosin_lbl)) +
-    stat_summary(fun.data = median_hilow, geom = "smooth",
-                 linewidth = 0.8, alpha = 0.2, se = TRUE, span = 0.4) +
-    facet_wrap(~ outcome_lbl) +
-    labs(x = "Months since index date", y = "BMI (kg/m2)",
-         colour = "On Tamsulosin?") +
-    scale_colour_brewer(palette = "Set1") +
-    theme_bw()
-
-  ggsave(paste0("tamsulosin_ot_bmi_", tag, ".png"),
-         plot = bmi_plot, width = 8, height = 6, dpi = 300)
-
-  ## ============================================================
   ##  Counting-process Cox with time-varying recency + confounders
   ## ============================================================
   keep <- c("patid",
