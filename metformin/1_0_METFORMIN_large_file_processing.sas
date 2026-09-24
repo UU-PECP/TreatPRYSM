@@ -1,9 +1,24 @@
 
+/************************************************/
+** 	the Treat-PRYSM project 					**
+** 	Drug - Metformin							**
+**												**
+**	File 1_0: Raw extract processing            **
+**	Reused unchanged in shape from                **
+**	tamsulosin/1_0_large_file_processing.sas -   **
+**	this step is entirely generic CPRD Aurum     **
+**	ingestion (stringing together the 4-way      **
+**	split patient/practice/observation extract   **
+**	files, excluding Welsh practices), not       **
+**	drug- or disease-specific. Metformin's raw   **
+**	extract is its own pull (different patient   **
+**	population - T2DM, not BPH/nephrolithiasis)  **
+**	so this still needs to run once against it   **
+**	before 1_1 can build the T2DM base cohort.   **
+/************************************************/;
 
-
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-
+libname rawdata "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname output "F:\Users\Wyatt003\Metformin\Output";
 
 *STEP 1: Define a base cohort by stringing together 4 patient files;
 	*  	The following columns were not found in the contributing tables: crd, deathdate, frd, tod;
@@ -15,13 +30,12 @@ proc sql;
 		patid,
 		gender,
 		yob,
-		regstartdate, 
-		cprd_ddate, 
+		regstartdate,
+		cprd_ddate,
 		regenddate,
 		pracid
-	FROM rawdata.patient_1; 
+	FROM rawdata.patient_1;
 quit;
-
 
 proc sql;
 	CREATE TABLE base_cohort_2 AS
@@ -29,11 +43,11 @@ proc sql;
 		patid,
 		gender,
 		yob,
-		regstartdate, 
-		cprd_ddate, 
+		regstartdate,
+		cprd_ddate,
 		regenddate,
 		pracid
-	FROM rawdata.patient_2; 
+	FROM rawdata.patient_2;
 quit;
 
 proc sql;
@@ -42,11 +56,11 @@ proc sql;
 		patid,
 		gender,
 		yob,
-		regstartdate, 
-		cprd_ddate, 
+		regstartdate,
+		cprd_ddate,
 		regenddate,
 		pracid
-	FROM rawdata.patient_3; 
+	FROM rawdata.patient_3;
 quit;
 
 proc sql;
@@ -55,13 +69,12 @@ proc sql;
 		patid,
 		gender,
 		yob,
-		regstartdate, 
-		cprd_ddate, 
+		regstartdate,
+		cprd_ddate,
 		regenddate,
 		pracid
-	FROM rawdata.patient_4; 
+	FROM rawdata.patient_4;
 quit;
-
 
 data output.initial_cohort;
 set base_cohort_1
@@ -70,17 +83,13 @@ set base_cohort_1
 	base_cohort_4;
 run;
 
-		** 918886 patients ;
-
 proc sql;
 select count(distinct patid) as "Total extracted patients"n
 from output.initial_cohort;
 quit;
 
-*STEP 2: Exclude patients from Wales and extract lcd; 
+*STEP 2: Exclude patients from Wales and extract lcd;
 /*Import practice records */
-
-
 
 data output.practice;
 set rawdata.practice_1
@@ -98,22 +107,14 @@ select count(distinct pracid) as "Total practices"n
 from output.practice;
 quit;
 
-		** 1936 practices;
-
-data test3;
-set output.practice;
-where region = 10;
-run;
-
-
 proc sql;
 CREATE TABLE output.initial_cohort AS
 SELECT
 		coh.patid,
 		coh.gender,
 		coh.yob,
-		coh.regstartdate, 
-		coh.cprd_ddate, 
+		coh.regstartdate,
+		coh.cprd_ddate,
 		coh.regenddate,
 		coh.pracid,
 		pra.lcd
@@ -124,8 +125,7 @@ LEFT OUTER JOIN
         WHERE pra.region ne 10; /* no Welsh practices in data, this step is technically unnecessary */
 quit;
 
-
-*STEP 3: Create 1 event file out of 4 event files; 
+*STEP 3: Create 1 event file out of 4 event files;
 	*	selecting only certain variables
 	*	;
 
@@ -145,22 +145,19 @@ Data clinical_4 ;
 Set rawdata.observation_4 (keep=patid obsdate medcodeid obstypeid);
 run;
 
-
 data output.clinical;
 	set clinical_1
 	clinical_2
 	clinical_3
 	clinical_4;
 run;
-		** 1423855848 records; 
 
 proc datasets library = work kill nolist;
 run;
 quit;
 
 proc sql;
-create table unique_codes as 
+create table unique_codes as
 select distinct medcodeid
 from output.clinical;
 quit;
-

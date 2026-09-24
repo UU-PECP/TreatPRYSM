@@ -9,9 +9,9 @@
 /********************************************/;
 
 
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes";
+libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
+libname codelist "F:\Users\Wyatt003\Tamsulosin\Disorder_Codes";
 options fullstimer;
 
 
@@ -36,7 +36,7 @@ quit;
 /* HES Data */
 
 data rawdata.hes_hosp;
-	infile "F:\Users\Wyatt003\files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\hes_diagnosis_hosp_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\HES APC-LSOA linkage files\Type_2 25_006098\Type_2 25_006098\Aurum_linked\Final\hes_diagnosis_hosp_25_006098.txt" dsd dlm='09'x firstobs=2 truncover;
 	length patid $19 spno $12 admidate 8 discharged 8 ICD $5 ICDx $1;
 	input patid :$19. spno :$12. admidate :yymmdd10. discharged :yymmdd10. ICD :$5. ICDx :$1.;
 	format admidate discharged date9.;
@@ -44,17 +44,41 @@ run;
 
 proc sql;
 	CREATE TABLE output.aSAH_apc AS
-	SELECT 
+	SELECT
 		clin.patid, MIN(clin.admidate) AS aSAH_dt format=ddmmyy10., clin.ICD, clin.ICDx
-	FROM 
+	FROM
 		rawdata.hes_hosp AS clin
 	WHERE clin.ICD IN (
 		"I60", "I60.0", "I60.0", "I60.01", "I60.02",
 		"I60.1", "I60.10", "I60.11", "I60.12",
-		"I60.2", "I60.3", "I60.30", "I60.31", 
-		"I60.32", "I60.4", "I60.5", "I60.50", 
-		"I60.51", "I60.52", "I60.6", "I60.7", 
+		"I60.2", "I60.3", "I60.30", "I60.31",
+		"I60.32", "I60.4", "I60.5", "I60.50",
+		"I60.51", "I60.52", "I60.6", "I60.7",
 		"I60.8", "I60.9"
+)
+	GROUP BY clin.patid;
+quit;
+
+/**************************************************************************/
+/* Sensitivity outcome definition: same aSAH case ascertainment, but      */
+/* excluding the two non-specific ICD-10 codes I60.8 (other subarachnoid  */
+/* haemorrhage) and I60.9 (unspecified). Feeds "aSAH_specific" downstream */
+/* (file 4/5) as an alternative outcome for the sensitivity analysis -    */
+/* everything else (I60 and I60.0-I60.7) still counts.                   */
+/**************************************************************************/
+
+proc sql;
+	CREATE TABLE output.aSAH_apc_specific AS
+	SELECT
+		clin.patid, MIN(clin.admidate) AS aSAH_specific_dt format=ddmmyy10.
+	FROM
+		rawdata.hes_hosp AS clin
+	WHERE clin.ICD IN (
+		"I60", "I60.0", "I60.0", "I60.01", "I60.02",
+		"I60.1", "I60.10", "I60.11", "I60.12",
+		"I60.2", "I60.3", "I60.30", "I60.31",
+		"I60.32", "I60.4", "I60.5", "I60.50",
+		"I60.51", "I60.52", "I60.6", "I60.7"
 )
 	GROUP BY clin.patid;
 quit;
@@ -73,7 +97,7 @@ run;
 
 
 data RareDisease_cod;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
+	infile "F:\Users\Wyatt003\Tamsulosin\Disorder_Codes\RareDiseases.txt" dsd dlm='09'x firstobs=2 truncover;
 	length medcodeid $19 ;
 	input medcodeid :$19. ;
 run;
@@ -158,10 +182,12 @@ quit;
 
 proc SQL;
 	CREATE TABLE output.bph_cohort AS
-	SELECT bc.*, 
-		   aSAH.aSAH_dt as aSAH_apc_dt
+	SELECT bc.*,
+		   aSAH.aSAH_dt as aSAH_apc_dt,
+		   aSAH_sp.aSAH_specific_dt
 	FROM output.BPH_initial AS bc
-	LEFT OUTER JOIN output.aSAH_apc AS aSAH ON bc.patid = aSAH.patid;
+	LEFT OUTER JOIN output.aSAH_apc AS aSAH ON bc.patid = aSAH.patid
+	LEFT OUTER JOIN output.aSAH_apc_specific AS aSAH_sp ON bc.patid = aSAH_sp.patid;
 quit;
 
 
@@ -178,9 +204,9 @@ quit;
 data output.bph_cohort;
 	set output.bph_cohort;
 
-	*Define baseline dt as the later of registration start date or bph_dt, floored at study start (31OCT2002);
+	*Define baseline dt as registration start date, floored at study start (31OCT2002);
 	informat baseline_dt DDMMYY10.;
-	baseline_dt = regstartdate; 
+	baseline_dt = regstartdate;
 	if baseline_dt < '31OCT2002'd then baseline_dt = '31OCT2002'd;
 	format baseline_dt DDMMYY10.;
 	run;
@@ -252,7 +278,7 @@ by patid;
 run;
 
 data output.bph_cohort;
-set bph_genderexc (keep = patid yob regstartdate aSAH_apc_dt baseline_dt censordate reg_age);
+set bph_genderexc (keep = patid yob regstartdate aSAH_apc_dt aSAH_specific_dt baseline_dt censordate reg_age);
 by patid;
 if first.patid;
 run;

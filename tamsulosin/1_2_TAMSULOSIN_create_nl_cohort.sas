@@ -9,9 +9,9 @@
 /********************************************/;
 
 
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes";
+libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
+libname codelist "F:\Users\Wyatt003\Tamsulosin\Disorder_Codes";
 options fullstimer;
 
 
@@ -105,9 +105,9 @@ quit;
 data output.nl_cohort;
 	set output.nl_cohort;
 
-	*Define baseline dt as the later of registration start date or nl_dt, floored at NL study start (01DEC2007);
+	*Define baseline dt as registration start date, floored at NL study start (01DEC2007);
 	informat baseline_dt DDMMYY10.;
-	baseline_dt = max(of regstartdate nl_dt);
+	baseline_dt = regstartdate;
 	if baseline_dt < '01DEC2007'd then baseline_dt = '01DEC2007'd;
 	format baseline_dt DDMMYY10.;
 	run;

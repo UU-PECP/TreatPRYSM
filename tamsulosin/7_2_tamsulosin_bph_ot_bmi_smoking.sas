@@ -11,7 +11,7 @@
 /*    - Smoking:  output.smoking_all, date = obsdate, flags = smk_cur/ex/non */
 /**************************************************************************/
 
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
 options fullstimer;
 
 %LET inputfile = output.bph_ot_all;
@@ -130,8 +130,11 @@ proc sql;
 create table output.bph_ot_bmi_smk_age as
 select ot.*, year(ot.interval_window_start) - bc.yob as age_at_interval_start
 from output.bph_ot_bmi_smk as ot
-left join output.bph_cohort as bc 
-on ot.patid = bc.patid;
+left join output.bph_cohort as bc
+	       on ot.patid = bc.patid;
 quit;
 
-
+data output.bph_ot_test;
+set output.bph_ot_bmi_smk_age;
+where interval_window_start > '31MAR2024'd;
+run;

@@ -14,7 +14,7 @@ library(janitor)
 
 ### Reading in data
 
-nldata <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\All_nl_drugissue.sas7bdat")
+nldata <- read_sas("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\All_nl_drugissue.sas7bdat")
 
 nldata <- nldata %>% mutate(drugsubstancename = if_else(drugsubstancename == "", "None", drugsubstancename))
 
@@ -91,8 +91,8 @@ treat_epi_all <- bind_rows(treat_episode, .id = "drugsubstancename")
 
 
 
-write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\nl_treatmentepisodes.csv")
-treat_epi_all <- read.csv("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\nl_treatmentepisodes.csv")
+write.csv(treat_epi_all, "F:\\Users\\Wyatt003\\Tamsulosin\\Output\\nl_treatmentepisodes.csv")
+treat_epi_all <- read.csv("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\nl_treatmentepisodes.csv")
 ### Per protocol: keep only first coverage blocks (prioritizes first record in the case of multi-drug)
 
 nl_pp <- treat_epi_all %>% filter(episode.ID == 1) %>% mutate(patid = as.character(patid))
@@ -105,7 +105,7 @@ nl_pp <- nl_pp %>%
 
 ### Combine treatment episode info with base cohort
 
-nl_cohort <- read_sas("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\nl_cohort.sas7bdat")
+nl_cohort <- read_sas("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\nl_cohort.sas7bdat")
 
 nl_pp <- right_join(nl_pp, nl_cohort, by = "patid")
 
@@ -130,5 +130,5 @@ bph_filters <- bph_pp %>%
   filter(episode.start > lubridate::ymd('2002-10-31'))
 
 
-write.csv(bph_pp, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_perprotocol.csv")
+write.csv(bph_pp, "F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_perprotocol.csv")
 

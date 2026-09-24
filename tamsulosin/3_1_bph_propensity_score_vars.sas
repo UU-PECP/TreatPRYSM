@@ -1,6 +1,6 @@
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
-libname codelist "F:\Users\Wyatt003\BPH_nephrolithiasis\3_MagdasCodes";
+libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
+libname codelist "F:\Users\Wyatt003\Tamsulosin\Disorder_Codes";
 
 options fullstimer; 
 
@@ -110,7 +110,8 @@ data disorders;
 	codelist.alcohol, output.alcohol_cohort, alcohol
 	codelist.alzheimers_disease, output.alzheimers_disease_cohort, alzheimers_disease
 	codelist.cancer, output.cancer_cohort, cancer
-	codelist.cirrhosis, output.cirrhosis_cohort, cirrhosis
+	codelist.chronic_liver, output.chronic_liver_cohort, chronic_liver
+	codelist.alopecia, output.alopecia_cohort, alopecia
 	codelist.copd, output.copd_cohort, copd
 	codelist.stroke, output.stroke_cohort, stroke
 	codelist.rheum_disease, output.rheum_cohort, rheum_disease

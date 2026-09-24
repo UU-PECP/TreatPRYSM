@@ -15,8 +15,8 @@
 /*	- moved covariate creation into file 7_2								*/
 /**************************************************************************/
 
-libname rawdata "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
+libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname output "F:\Users\Wyatt003\Tamsulosin\Output";
 options fullstimer;
 
 /**************************************************************************/
@@ -27,7 +27,7 @@ options fullstimer;
 AdhereR exports a .csv file that then must be imported into SAS */
 
 data output.bph_treatmentepisodes;
-	infile "F:\Users\Wyatt003\BPH_nephrolithiasis\Output\bph_treatmentepisodes.csv"
+	infile "F:\Users\Wyatt003\Tamsulosin\Output\bph_treatmentepisodes.csv"
 		dsd dlm=',' firstobs=2 truncover;
 	length exposure 8 patid $19 episode_ID 8
 	       episode_start 8 end_episode_gap_days 8 episode_duration 8 episode_end 8;
@@ -35,6 +35,32 @@ data output.bph_treatmentepisodes;
 	      episode_start :yymmdd10. end_episode_gap_days episode_duration episode_end :yymmdd10.;
 	format episode_start episode_end date9.;
 run;
+
+/**************************************************************************/
+/* STEP 0.1: Build the bridge-coverage table Step 2.2 relies on            */
+/**************************************************************************/
+/* This header previously said we'd use the AdhereR episodes directly as  */
+/* the coverage blocks instead of rebuilding bridged coverage from raw Rx */
+/* (as Jos's amlodipine script did), but that rename/build step was never */
+/* actually added - output.BridgeCoverage_IndexDrug was referenced in     */
+/* Step 2.2 below without anything in this file (or any other tamsulosin  */
+/* script) ever creating it, so this script could not run past Step 2.2   */
+/* as previously committed. This does what the header always said the    */
+/* intent was: every episode of a patient's own exposure (tamsulosin,     */
+/* alfuzosin, or finasteride - whichever this row's "exposure" is) becomes*/
+/* one coverage block, keyed by (patid, exposure) so a later episode of   */
+/* the SAME drug can keep recency "Current" even once the episode that    */
+/* defines a given bph_treatmentepisodes_fu row has ended.                */
+/**************************************************************************/
+
+proc sql;
+	create table output.BridgeCoverage_IndexDrug as
+	select patid,
+	       exposure,
+	       episode_start as bridged_coverage_start,
+	       episode_end   as bridged_coverage_end
+	from output.bph_treatmentepisodes;
+quit;
 
 /**************************************************************************/
 /* STEP 1.0: Create mg Value and Mean Daily Dose                          */
@@ -95,6 +121,7 @@ data output.bph_treatmentepisodes_fu;
 			 keep=patid censordate aSAH_apc_dt);
 	by patid;
 	if inA and inB;
+	earliest_rx_date = episode_start;  /* episode_start is the first Rx date of this AdhereR-bridged episode */
 	index_date = earliest_rx_date;
 	index_exposure = exposure;
 	end_of_fu = '31MAR2025'd;
@@ -102,8 +129,13 @@ data output.bph_treatmentepisodes_fu;
 	if not missing(censordate) and censordate < end_of_fu then end_of_fu = censordate;
 	if not missing(aSAH_apc_dt) and aSAH_apc_dt < end_of_fu then end_of_fu = aSAH_apc_dt;
 
-	/* Additional censoring at switch_date if it exists and is earlier */
-	if not missing(episode_end) and episode_end < end_of_fu then end_of_fu = episode_end;
+	/* NOTE: this used to also cap end_of_fu at episode_end (i.e. the end   */
+	/* of the one treatment episode that defines this row). That meant     */
+	/* follow-up never extended past the episode itself, so every 30-day   */
+	/* interval fell inside it and treatment_recency_status (Step 2.3)    */
+	/* could only ever compute to 'Current' - 'Recent'/'Past' were         */
+	/* unreachable, which defeats the point of an on-treatment analysis.   */
+	/* Follow-up now runs to censoring/aSAH/study end only.                 */
 
 	/* Only keep if valid follow-up (index_date < end_of_fu */
 	if index_date < end_of_fu;
@@ -132,8 +164,10 @@ run;
 /**************************************************************************/
 /* STEP 2.1: Carry most-recent per-Rx dose (mg_value) into each interval  */
 /**************************************************************************/
-/* mg_value is per-prescription in Rx_bph_PostStart; propagate the most    */
-/* recent value forward across intervals (time-varying dose).              */
+/* mg_value is per-prescription in output.all_bph_episodes (the final,    */
+/* HES-linked episode table from 2_1 - not the earlier intermediate       */
+/* Rx_bph_PostStart, which this comment used to name); propagate the      */
+/* most recent value forward across intervals (time-varying dose).        */
 
 proc sort data = output.all_bph_episodes
           out  = mg_sorted(keep=patid issuedate mg_value);
@@ -165,9 +199,15 @@ run;
 /**************************************************************************/
 /* STEP 2.2: Last coverage block starting on/before interval_window_start */
 /**************************************************************************/
+/* Joined on exposure as well as patid: BridgeCoverage_IndexDrug (Step    */
+/* 0.1) now holds every episode of all three BPH drugs, so without the    */
+/* exposure match a patient who later used a different drug than the one */
+/* that defines this fu row would incorrectly pick up that other drug's  */
+/* coverage as "last treatment".                                          */
 proc sql;
 	create table output.IntervalCoverage_OT as
 	select i.patid,
+		   i.episode_ID,
 		   i.interval_window_start,
 		   i.interval_window_end,
 		   max(b.bridged_coverage_start) as last_coverage_period_start format=date9.,
@@ -175,22 +215,58 @@ proc sql;
 	from output.ThirtyDayIntervals_OnT i
 		 left join output.BridgeCoverage_IndexDrug b
 			on i.patid = b.patid
+			and i.exposure = b.exposure
 			and b.bridged_coverage_start <= i.interval_window_start
-	group by i.patid, i.interval_window_start, i.interval_window_end
-	order by i.patid, i.interval_window_start;
+	group by i.patid, i.episode_ID, i.interval_window_start, i.interval_window_end
+	order by i.patid, i.episode_ID, i.interval_window_start;
 quit;
+
+/**************************************************************************/
+/* STEP 2.2b: Dose sensitivity analysis - attach the time-varying dose    */
+/* (mg_value_current, from Step 2.1) to each interval, and derive a       */
+/* doses/day category (1 dose = 0.4mg, the standard tamsulosin dose):     */
+/* "<1 dose" vs ">=1 dose" per day. mg_value_current is missing before a  */
+/* patient's first prescription, so dose_category_perday is left missing */
+/* there too (never meaningful outside "Current" - see 7_3).             */
+/**************************************************************************/
+proc sort data = output.IntervalCoverage_OT; by patid episode_ID interval_window_start; run;
+proc sort data = output.IntervalDose (keep = patid episode_ID interval_window_start mg_value_current)
+          out  = IntervalDose_sorted;
+	by patid episode_ID interval_window_start;
+run;
+
+data output.IntervalCoverage_OT;
+	merge output.IntervalCoverage_OT (in=inC)
+	      IntervalDose_sorted        (in=inD);
+	by patid episode_ID interval_window_start;
+	if inC;
+
+	length dose_category_perday $8;
+	if not missing(mg_value_current) then do;
+		if mg_value_current >= 0.4 then dose_category_perday = ">=1 dose";
+		else dose_category_perday = "<1 dose";
+	end;
+run;
 
 
 /**************************************************************************/
 /* STEP 2.3: Classify recency (Current/Recent/Past) and flag aSAH        */
 /**************************************************************************/
-proc sort data = output.IntervalCoverage_OT; by patid; run;
+/* output.bph_treatmentepisodes_fu (built in Step 1.1) is one row per     */
+/* treatment episode, so the merge below is keyed on patid AND episode_ID */
+/* - not patid alone - to avoid a many-to-many merge for patients with    */
+/* more than one episode.                                                 */
+proc sort data = output.IntervalCoverage_OT; by patid episode_ID; run;
 
-data &out;
+proc sort data = output.bph_treatmentepisodes_fu
+          out  = fu_keep (keep = patid episode_ID index_exposure index_date end_of_fu aSAH_apc_dt);
+by patid episode_ID;
+run;
+
+data output.bph_ot_all;
 	merge output.IntervalCoverage_OT(in=inI)
-	      output.OverallFollowup_OnT(in=inO
-			keep = patid index_exposure index_date end_of_fu aSAH_gp_dt);
-	by patid;
+	      fu_keep(in=inO);
+	by patid episode_ID;
 	if inI and inO;
 
 	if not missing(last_coverage_period_start) then do;
@@ -210,14 +286,14 @@ data &out;
 		days_since_bridge_start = .;
 
 	/* aSAH flag if event falls within this 30-day window */
-	if not missing(aSAH_gp_dt) and
-	   aSAH_gp_dt >= interval_window_start and
-	   aSAH_gp_dt <= interval_window_end then aSAH_within_interval = 1;
+	if not missing(aSAH_apc_dt) and
+	   aSAH_apc_dt >= interval_window_start and
+	   aSAH_apc_dt <= interval_window_end then aSAH_within_interval = 1;
 	else aSAH_within_interval = 0;
 
 	fu_days = end_of_fu - index_date + 1;
 
-	format index_date end_of_fu interval_window_start interval_window_end aSAH_gp_dt date9.;
+	format index_date end_of_fu interval_window_start interval_window_end aSAH_apc_dt date9.;
 run;
 
 
@@ -237,13 +313,9 @@ proc sql;
 	group by index_exposure;
 quit;
 
-
-data output.drugfile_subset;
-set output.bphdrugatc_1 (obs = 100000);
-run;
-
 proc sort data = output.bph_ot_all;
 by patid;
 run;
+
 
 
