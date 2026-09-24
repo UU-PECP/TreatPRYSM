@@ -295,9 +295,12 @@ ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease
 d$pscore <- predict(ps_model, type = "response")
 
 table(d$tamsulosin)
+png("F:\\Users\\Wyatt003\\Tamsulosin\\Results\\tamsulosin_ps_hist_alfuzosin.png",
+    height = 15, width = 20, unit = "cm", res = 300)
 par(mfrow=c(2,1))
 hist(d$pscore[d$tamsulosin==1],100, xlim = c(0.8, 1))
 hist(d$pscore[d$tamsulosin==0],100, xlim = c(0.8, 1))
+dev.off()
 
    # Finasteride
 
@@ -315,9 +318,12 @@ ps_model <- glm(tamsulosin ~ age_at_index + acidosis + aids + alzheimers_disease
 d$pscore <- predict(ps_model, type = "response")
 
 table(d$tamsulosin)
+png("F:\\Users\\Wyatt003\\Tamsulosin\\Results\\tamsulosin_ps_hist_finasteride.png",
+    height = 15, width = 20, unit = "cm", res = 300)
 par(mfrow=c(2,1))
 hist(d$pscore[d$tamsulosin==1])
 hist(d$pscore[d$tamsulosin==0])
+dev.off()
 
    # Ps- distribution plot
 
