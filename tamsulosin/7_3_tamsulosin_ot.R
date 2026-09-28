@@ -107,6 +107,22 @@ df <- df %>%
    ggsave(paste0("tamsulosin_ot_km_", tag, ".png"),
           plot = gg_crude$plot, width = 8, height = 6, dpi = 300)
 
+  ## fill missing BMI by per-patient median (keep NA if all missing)
+  d_filled <- d %>%
+    group_by(patid) %>%
+    mutate(across(bmi_value,
+                  ~ ifelse(is.na(.x),
+                           ifelse(is.nan(median(.x, na.rm = TRUE)), NA,
+                                  median(.x, na.rm = TRUE)),
+                           .x))) %>%
+    ungroup()
+
+  ## ever-aSAH flag (patient level)
+  d_filled <- d_filled %>%
+    group_by(patid) %>%
+    mutate(ever_aSAH = any(aSAH_within_interval == 1)) %>%
+    ungroup()
+
   ## ============================================================
   ##  Counting-process Cox with time-varying recency + confounders
   ## ============================================================
