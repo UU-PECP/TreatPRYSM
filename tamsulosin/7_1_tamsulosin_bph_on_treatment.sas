@@ -15,8 +15,8 @@
 /*	- moved covariate creation into file 7_2								*/
 /**************************************************************************/
 
-libname rawdata "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
-libname output "F:\Users\Wyatt003\Tamsulosin\Output";
+libname rawdata "E:\Tamsulosin\Raw_Data";
+libname output "E:\Tamsulosin\Output";
 options fullstimer;
 
 /**************************************************************************/
@@ -81,7 +81,7 @@ proc sql;
          e.episode_start,
          e.episode_end,
          sum(r.quantity) as total_tablets,
-		 mean(r.mg_value) as mean_daily_dose
+		 mean(r.mg_value) as mean_mg
   from output.bph_treatmentepisodes e
        inner join rx_sorted r
        on e.patid = r.patid
@@ -104,7 +104,8 @@ run;
 
 data output.bph_treatmentepisodes_mgqty;
 set output.bph_treatmentepisodes_mgqty;
-cumulative_dose = total_tablets*mean_daily_dose;
+cumulative_dose = total_tablets*mean_mg;
+mean_daily_dose = (quantity*total_tablets)/(episode_end-episode_start);
 run;
 
 /**************************************************************************/
@@ -170,8 +171,16 @@ run;
 /* most recent value forward across intervals (time-varying dose).        */
 
 proc sort data = output.all_bph_episodes
-          out  = mg_sorted(keep=patid issuedate mg_value);
+          out  = mg_sorted(keep=patid issuedate mg_value quantity assumed_duration);
 	by patid issuedate;
+run;
+
+* Note: this definition is slightly cyclical because quantity was used to calculate assumed duration;
+
+data mg_sorted;
+set mg_sorted;
+mean_daily_dose = (mg_value*quantity)/assumed_duration;
+keep patid issuedate mean_daily_dose;
 run;
 
 proc sort data = output.ThirtyDayIntervals_OnT
@@ -186,10 +195,10 @@ data output.IntervalDose;
 	by patid issuedate;
 	retain last_dose;
 
-	if inRx  then last_dose = mg_value;          /* update on Rx rows */
+	if inRx  then last_dose = mean_daily_dose;          /* update on Rx rows */
 	if inInt then do;                            /* output interval rows */
 		interval_window_start   = issuedate;     /* restore original name */
-		mg_value_current        = last_dose;     /* most-recent dose */
+		daily_dose_current        = last_dose;     /* most-recent dose */
 		output;
 	end;
 	drop issuedate last_dose;
@@ -230,7 +239,7 @@ quit;
 /* there too (never meaningful outside "Current" - see 7_3).             */
 /**************************************************************************/
 proc sort data = output.IntervalCoverage_OT; by patid episode_ID interval_window_start; run;
-proc sort data = output.IntervalDose (keep = patid episode_ID interval_window_start mg_value_current)
+proc sort data = output.IntervalDose (keep = patid episode_ID interval_window_start daily_dose_current)
           out  = IntervalDose_sorted;
 	by patid episode_ID interval_window_start;
 run;
@@ -242,8 +251,8 @@ data output.IntervalCoverage_OT;
 	if inC;
 
 	length dose_category_perday $8;
-	if not missing(mg_value_current) then do;
-		if mg_value_current >= 0.4 then dose_category_perday = ">=1 dose";
+	if not missing(daily_dose_current) then do;
+		if daily_dose_current >= 0.4 then dose_category_perday = ">=1 dose";
 		else dose_category_perday = "<1 dose";
 	end;
 run;
@@ -308,7 +317,7 @@ proc sql;
 		   max(fu_days) as max_fu_days,
 		   median(fu_days) as median_fu_days,
 		   mean(fu_days) as mean_fu_days,
-		   sum(aSAH_within_interval) as n_asah_cases
+		   sum(aSAH_within_interval) as n_asah_cases,
 	from output.bph_ot_all
 	group by index_exposure;
 quit;
@@ -317,5 +326,15 @@ proc sort data = output.bph_ot_all;
 by patid;
 run;
 
+proc univariate data = output.bph_ot_all;
+var daily_dose_current;
+run;
 
+proc freq data = output.bph_ot_all;
+tables daily_dose_current / missing;
+run;
 
+proc freq data = output.bph_ot_all;
+tables dose_category_perday / missing;
+where index_exposure = 1;
+run;
