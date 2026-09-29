@@ -11,14 +11,15 @@ library(tableone)
 library(gtsummary)
 library(flextable)
 library(writexl)
+library(stringr)
 
 ## ============================================================
 ##  Read the on-treatment interval dataset (from File 7.1 + 7.2)
 ## ============================================================
-df <- read_sas('F://Users//Wyatt003//Tamsulosin//Output//bph_ot_test.sas7bdat')
+df <- read_sas("E:\\Tamsulosin\\Output\\bph_ot_bmi_smk_age.sas7bdat")
 sapply(df, class)
 
-setwd("F:\\Users\\Wyatt003\\Tamsulosin\\Results")
+setwd("E:\\Tamsulosin\\Results")
 ## Exposure coding: 1 = tamsulosin, 2 = alfuzosin, 3 = finasteride
 ## Explicit binary exposure: tamsulosin vs comparator
 df$tamsulosin <- ifelse(df$index_exposure == 1, 1, 0)
@@ -70,7 +71,7 @@ df <- df %>%
       total_cases           = sum(aSAH),
       total_follow_up       = sum(fu_days),
       total_follow_up_years = sum(fu_days) / 365.25,
-      median_fu_days        = median(fu_days),
+      median_fu_years        = median(fu_days)/365.25,
       .groups = "drop"
     ) %>%
     mutate(incidence_rate = (total_cases / as.numeric(total_follow_up_years)) * 1000)
@@ -107,31 +108,42 @@ df <- df %>%
    ggsave(paste0("tamsulosin_ot_km_", tag, ".png"),
           plot = gg_crude$plot, width = 8, height = 6, dpi = 300)
 
-  ## fill missing BMI by per-patient median (keep NA if all missing)
-  d_filled <- d %>%
-    group_by(patid) %>%
-    mutate(across(bmi_value,
-                  ~ ifelse(is.na(.x),
-                           ifelse(is.nan(median(.x, na.rm = TRUE)), NA,
-                                  median(.x, na.rm = TRUE)),
-                           .x))) %>%
-    ungroup()
-
-  ## ever-aSAH flag (patient level)
-  d_filled <- d_filled %>%
-    group_by(patid) %>%
-    mutate(ever_aSAH = any(aSAH_within_interval == 1)) %>%
-    ungroup()
-
+ 
   ## ============================================================
   ##  Counting-process Cox with time-varying recency + confounders
   ## ============================================================
-  keep <- c("patid",
+  
+   d_filled <- d %>%
+     group_by(patid) %>%
+     mutate(across(bmi_value,
+                   ~ ifelse(is.na(.x),
+                            ifelse(is.nan(median(.x, na.rm = TRUE)), NA,
+                                   median(.x, na.rm = TRUE)),
+                            .x))) %>%
+     ungroup()
+   
+   ## ever-aSAH flag (patient level)
+   d_filled <- d_filled %>%
+     group_by(patid) %>%
+     mutate(ever_aSAH = any(aSAH_within_interval == 1)) %>%
+     ungroup()
+   
+   bmi_vars <- c("patid", "interval_window_start", "tamsulosin", "index_date",
+                 "interval_window_end", "ever_aSAH", "bmi_value")
+   df_bmi <- d_filled %>% select(all_of(bmi_vars)) %>%
+     mutate(
+       t_months_start = as.numeric(interval_window_start - index_date) / 30,
+       tamsulosin_lbl = factor(tamsulosin, labels = c("No", "Yes")),
+       outcome_lbl    = if_else(ever_aSAH, "Ever aSAH", "No aSAH")
+     )
+   
+   d_filled <- d_filled %>% mutate(recency = paste0(treatment_recency_status, "_", tamsulosin))
+   
+   keep <- c("patid",
             "interval_window_start", "interval_window_end", "index_date",
             "aSAH_within_interval",
-            "treatment_recency_status",
+            "recency",
             "tamsulosin",
-            "dose_category_perday",   # for the dose sensitivity analysis below
             "bmi_value", "smk_cur", "smk_ex", "smk_non",   # time-varying confounders
             "age_at_interval_start")
 
@@ -140,8 +152,8 @@ df <- df %>%
   df_cox <- copy(d_filled)[ , `:=`(
     tstart  = as.numeric(interval_window_start - index_date),
     tstop   = as.numeric(interval_window_end   - index_date),
-    rec_fac = factor(treatment_recency_status,
-                     levels = c("Past", "Recent", "Current"))
+    rec_fac = factor(recency,levels = c("Current_0", "Past_0", "Recent_0","Current_1", "Past_1", "Recent_1")
+                     )
     # ses_i   = as.integer(factor(deprivation_decile))
   )][ , c("interval_window_start", "interval_window_end",
           "index_date", "treatment_recency_status"
@@ -150,9 +162,21 @@ df <- df %>%
 
   setorder(df_cox, tstop)
 
-  cox_fit <- coxph(
+  cox_fit_rec <- coxph(
     Surv(tstart, tstop, aSAH_within_interval) ~
-      relevel(rec_fac, ref = "Past") +
+      relevel(rec_fac, ref = "Current_0") +
+      bmi_value + smk_cur + smk_ex +        # smk_non is the reference smoking level
+      age_at_interval_start,
+    data    = df_cox,
+    cluster = patid,
+    ties    = "breslow",
+    x = FALSE, y = FALSE, model = FALSE,
+    robust  = TRUE,
+    control = coxph.control(timefix = FALSE, iter.max = 20)
+  )
+  
+  cox_fit_adj <- coxph(
+    Surv(tstart, tstop, aSAH_within_interval) ~
       tamsulosin +
       bmi_value + smk_cur + smk_ex +        # smk_non is the reference smoking level
       age_at_interval_start,
@@ -164,43 +188,77 @@ df <- df %>%
     control = coxph.control(timefix = FALSE, iter.max = 20)
   )
   
-  tbl_regression(cox_fit, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_recency_", tag, ".docx"))
-
-  ## ============================================================
-  ##  Secondary model: dose sensitivity (Comparator / <1 dose / >=1 dose
-  ##  per day, 1 dose = 0.4mg), among intervals currently on tamsulosin -
-  ##  per protocol, dose is only meaningful while actively on treatment.
-  ## ============================================================
-  df_dose <- copy(d_filled)[ , `:=`(
-    tstart = as.numeric(interval_window_start - index_date),
-    tstop  = as.numeric(interval_window_end   - index_date),
-    dose_status = fifelse(tamsulosin == 0, "Comparator",
-                    fifelse(treatment_recency_status == "Current" & dose_category_perday == "<1 dose",  "Current-Low",
-                    fifelse(treatment_recency_status == "Current" & dose_category_perday == ">=1 dose", "Current-High", NA_character_)))
-  )][!is.na(dose_status)][ , dose_fac := factor(dose_status, levels = c("Comparator", "Current-Low", "Current-High"))]
-
-  setorder(df_dose, tstop)
-
-  cox_dose <- coxph(
-    Surv(tstart, tstop, aSAH_within_interval) ~
-      relevel(dose_fac, ref = "Comparator") +
-      bmi_value + smk_cur + smk_ex +
-      age_at_interval_start,
-    data    = df_dose,
-    cluster = patid,
-    ties    = "breslow",
-    x = FALSE, y = FALSE, model = FALSE,
-    robust  = TRUE,
-    control = coxph.control(timefix = FALSE, iter.max = 20)
-  )
-
-  tbl_regression(cox_dose, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_dose_", tag, ".docx"))
-
-  invisible(list(incidence = summary_data, cox = cox_fit, cox_dose = cox_dose))
+  tbl_regression(cox_fit_rec, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_recency_", tag, ".docx"))
+  tbl_regression(cox_fit_adj, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_adjusted_", tag, ".docx"))
+  
+  invisible(list(incidence = summary_data, 
+                 cox_crude = cox_model, 
+                 cox_recency = cox_fit_rec,
+                 cox_adjusted = cox_fit_adj))
  }
 
 ## ============================================================
 ##  Run both referent models
 ## ============================================================
 alf_results <- run_ot_analysis(df, ref_code = 2, tag = "alfuzosin")
+gc()
+
 fin_results <- run_ot_analysis(df, ref_code = 3, tag = "finasteride")
+gc()
+
+
+
+
+
+## ============================================================
+##  Secondary model: dose sensitivity (Comparator / <1 dose / >=1 dose
+##  per day, 1 dose = 0.4mg), among intervals currently on tamsulosin -
+##  per protocol, dose is only meaningful while actively on treatment.
+## ============================================================
+
+dose_analysis <- function(df, ref_code, tag) {
+
+d_filled <- df %>%
+  group_by(patid) %>%
+  mutate(across(bmi_value,
+                ~ ifelse(is.na(.x),
+                         ifelse(is.nan(median(.x, na.rm = TRUE)), NA,
+                                median(.x, na.rm = TRUE)),
+                         .x))) %>%
+  ungroup()
+
+## ever-aSAH flag (patient level)
+d_filled <- d_filled %>%
+  group_by(patid) %>%
+  mutate(ever_aSAH = any(aSAH_within_interval == 1)) %>%
+  ungroup()
+
+df_dose <- d_filled %>% mutate(
+  tstart = as.numeric(interval_window_start - index_date),
+  tstop  = as.numeric(interval_window_end   - index_date),
+  dose_fac = as.factor(paste0(tamsulosin, ", ", dose_category_perday)))
+
+setorder(df_dose, tstop)
+
+cox_dose <- coxph(
+  Surv(tstart, tstop, aSAH_within_interval) ~
+    relevel(dose_fac, ref = "0, >=1 dose") +
+    bmi_value + smk_cur + smk_ex +
+    age_at_interval_start,
+  data    = df_dose,
+  cluster = patid,
+  ties    = "breslow",
+  x = FALSE, y = FALSE, model = FALSE,
+  robust  = TRUE,
+  control = coxph.control(timefix = FALSE, iter.max = 20)
+)
+
+tbl_regression(cox_dose, exponentiate = TRUE) %>% as_flex_table() %>% save_as_docx(path = paste0("tamsulosin_ot_dose_", tag, ".docx"))
+
+}
+
+dose_analysis(df, ref_code = 2, tag = "alfuzosin")
+gc()
+dose_analysis(df, ref_code = 3, tag = "finasteride")
+gc()
+
