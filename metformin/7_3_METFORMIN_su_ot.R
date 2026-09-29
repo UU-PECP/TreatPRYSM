@@ -7,8 +7,8 @@
 cohort_label <- "su"
 comparator_name <- "Sulphonylureas"
 
-ot_sas_path <- "F:\\Users\\Wyatt003\\Metformin\\Output\\su_ot_bmi_smk_age.sas7bdat"
+ot_sas_path <- "E:\\Metformin\\Output\\su_ot_bmi_smk_age.sas7bdat"
 study_start_date <- "2004-01-01"
-results_dir <- "F:\\Users\\Wyatt003\\Metformin\\Results"
+results_dir <- "E:\\Metformin\\Results"
 
 source("F:\\Users\\Wyatt003\\Metformin\\VDI_Scripts\\7_3_0_METFORMIN_ot_analysis_body.R")
