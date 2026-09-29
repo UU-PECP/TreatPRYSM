@@ -2,30 +2,60 @@
 /**************************************************************************/
 /*  Treat-PRYSM - Metformin and aSAH risk                                 */
 /*  File 7_0: ON-TREATMENT ANALYSIS - SHARED BODY                         */
-/*  Modelled on tamsulosin/7_1_tamsulosin_bph_on_treatment.sas            */
+/*  Re-adapted from tamsulosin/7_1_tamsulosin_bph_on_treatment.sas's      */
+/*  current (post-fix) design, per an explicit decision to structurally  */
+/*  match it row-for-row rather than keep this file's earlier,           */
+/*  patient-level-only architecture.                                      */
 /*                                                                          */
-/*  TWO DELIBERATE FIXES vs. tamsulosin/7_1, not just adaptations:        */
+/*  WHAT CHANGED FROM THE EARLIER VERSION OF THIS FILE:                   */
 /*                                                                          */
-/*  1) tamsulosin/7_1's Step 2.2 reads from                                */
-/*     output.BridgeCoverage_IndexDrug, but no step in that file (or      */
-/*     anywhere else in the tamsulosin scripts) actually builds that      */
-/*     table - it's referenced but never created, so 7_1 as committed    */
-/*     cannot run past Step 2.2. Its header comment says the intent was  */
-/*     to reuse the AdhereR-built episodes directly as coverage blocks   */
-/*     (the original amlodipine version built it by hand from raw Rx     */
-/*     records - see AdditionalScripts/On_Treatment_Amlodipine_Script.sas)*/
-/*     - this file actually does that: STEP 0.1 below builds it from all */
-/*     of ALL_&cohort_label._episodes filtered to each patient's own      */
-/*     index exposure.                                                    */
+/*  1) Unit of analysis is now the EPISODE, not the patient. The earlier  */
+/*     version built ONE continuous 30-day-interval grid per patient      */
+/*     (index_date fixed at the patient's first-ever episode, via         */
+/*     `nodupkey by patid`). tamsulosin/7_1's current design instead      */
+/*     keeps every one of a patient's episodes (of EITHER drug) as its    */
+/*     own row, with index_date = THAT episode's own start, and builds    */
+/*     a fresh 30-day-interval grid for each one. This is what makes it   */
+/*     possible for the on-treatment Cox model below to compare current/  */
+/*     recent/past USE OF EITHER DRUG (see point 3) - but it also means   */
+/*     the Cox model's time origin resets at each episode's own start     */
+/*     rather than running on one continuous timeline from the patient's  */
+/*     actual cohort entry. This was flagged explicitly while adapting -  */
+/*     see the metformin/README.md "Bugs found" section for the tamsulosin */
+/*     side of this - and kept deliberately, to match tamsulosin exactly. */
 /*                                                                          */
-/*  2) tamsulosin/7_1 caps end_of_fu at the FIRST episode's end date      */
-/*     (episode_end) alongside censordate/aSAH. That means follow-up      */
-/*     never extends past the first episode, so a patient's recency      */
-/*     status can only ever be "Current" - "Recent"/"Past" become        */
-/*     unreachable, which defeats the point of an on-treatment design.   */
-/*     Here, end_of_fu runs to the overall censordate/aSAH/study end     */
-/*     only (not truncated at episode_end), so recency can actually      */
-/*     transition as a patient finishes, restarts, or switches.          */
+/*  2) BridgeCoverage_&cohort_label is now built from ALL of a patient's   */
+/*     episodes of EITHER drug (previously: only their own index          */
+/*     exposure's episodes), each tagged with its own `exposure`. Step 2.2 */
+/*     joins on (patid, exposure) so each interval only ever picks up      */
+/*     coverage of the SAME drug as its own row's episode.                */
+/*                                                                          */
+/*  3) STEP 2.3's recency classification and the R-side Cox model (7_3_0)  */
+/*     now compute Current/Recent/Past for whichever drug a given row's    */
+/*     episode is actually for - including comparator episodes, which      */
+/*     used to be lumped into one flat "Comparator" category. Crossed with */
+/*     the drug flag (metformin 0/1), this gives a 6-level recency factor   */
+/*     (Current/Recent/Past x Comparator/metformin) instead of the         */
+/*     earlier 4-level one (Comparator / Index-Current / Index-Recent /    */
+/*     Index-Past).                                                        */
+/*                                                                          */
+/*  TWO KNOWN LIMITATIONS CARRIED OVER UNCHANGED (found while doing this   */
+/*  adaptation, deliberately NOT fixed here - flag for a future pass):     */
+/*    - STEP 1.0's episode-level `mean_daily_dose` (in                    */
+/*      output.&cohort_label._treatmentepisodes_mgqty) is computed as      */
+/*      mean(mg_value) - the raw per-tablet strength - not the true        */
+/*      per-day dose (mg_value x tablets/day) that 2_0 already computes    */
+/*      correctly and carries into output.all_&cohort_label._episodes as   */
+/*      its OWN `mean_daily_dose` column. That correct value is not the    */
+/*      one read back in here (rx_sorted below only keeps mg_value), so    */
+/*      dose_category's 1000mg/day threshold is being compared against     */
+/*      per-tablet strength, not true daily dose.                          */
+/*    - STEP 2.1/2.1b's "last known dose"/"last known release pattern"     */
+/*      carry-forward (mg_sorted/rx_release) is built from ALL of a        */
+/*      patient's prescriptions of EITHER drug, not filtered to their      */
+/*      own index exposure the way BridgeCoverage now is - so a            */
+/*      comparator prescription issued between two metformin fills can     */
+/*      overwrite mg_value_current/release_pattern_current mid-episode.    */
 /*                                                                          */
 /*  Required %let parameters from the driver:                             */
 /*    &cohort_label   - e.g. su / sglt2i                                  */
@@ -37,9 +67,9 @@
 /*                       comparator episodes, all recurrences)            */
 /**************************************************************************/;
 
-libname rawdata "F:\Users\Wyatt003\Metformin\Raw_Data";
-libname output "F:\Users\Wyatt003\Metformin\Output";
-libname codelist "F:\Users\Wyatt003\Metformin\Drug_Codes";
+libname rawdata "E:\Metformin\Raw_Data";
+libname output "E:\Metformin\Output";
+libname codelist "E:\Metformin\Drug_Codes";
 options fullstimer;
 
 /**************************************************************************/
@@ -58,37 +88,19 @@ data output.&cohort_label._treatmentepisodes;
 run;
 
 /**************************************************************************/
-/* STEP 0.1: Determine each patient's index exposure and index date from  */
-/* their FIRST episode of either drug (matches the per-protocol index    */
-/* used in 4_0/5_0), then build the bridge-coverage table from ALL of    */
-/* that patient's episodes of THEIR OWN index exposure (i.e. if a        */
-/* patient's index drug is metformin, track their full metformin usage   */
-/* history over time, including any later stop/restart, for recency -    */
-/* not the comparator's usage).                                          */
+/* STEP 0.1: Build the bridge-coverage table Step 2.2 relies on. Every    */
+/* episode of EITHER drug becomes one coverage block, keyed by (patid,    */
+/* exposure) - not restricted to each patient's own index exposure - so   */
+/* recency can be computed for comparator episodes too (see header).      */
 /**************************************************************************/
 
-proc sort data = output.&cohort_label._treatmentepisodes;
-by patid episode_start;
-run;
-
-data patient_index;
-set output.&cohort_label._treatmentepisodes;
-by patid;
-if first.patid;
-index_date = episode_start;
-index_exposure = exposure;
-keep patid index_date index_exposure;
-run;
-
 proc sql;
-create table output.BridgeCoverage_&cohort_label as
-select e.patid,
-       e.episode_ID,
-       e.episode_start as bridged_coverage_start,
-       e.episode_end as bridged_coverage_end
-from output.&cohort_label._treatmentepisodes as e
-inner join patient_index as p
-on e.patid = p.patid and e.exposure = p.index_exposure;
+	create table output.BridgeCoverage_&cohort_label as
+	select patid,
+	       exposure,
+	       episode_start as bridged_coverage_start,
+	       episode_end   as bridged_coverage_end
+	from output.&cohort_label._treatmentepisodes;
 quit;
 
 /**************************************************************************/
@@ -150,9 +162,11 @@ end;
 run;
 
 /**************************************************************************/
-/* STEP 1.1: Create end of follow-up variable (index episode's own start */
-/* through overall censoring - NOT capped at the first episode's end;    */
-/* see header comment).                                                   */
+/* STEP 1.1: Create end of follow-up variable. One row per EPISODE (not   */
+/* deduplicated to one row per patient) - index_date/index_exposure are   */
+/* this episode's own start/drug, mirroring tamsulosin/7_1 exactly. See   */
+/* header comment (point 1) on what this means for the Cox model's time   */
+/* origin.                                                                 */
 /**************************************************************************/
 
 proc sort data = output.t2dm_cohort;
@@ -161,11 +175,12 @@ run;
 
 data output.&cohort_label._episodes_fu;
 	merge output.&cohort_label._treatmentepisodes_mgqty(in=inA)
-	      patient_index(in=inP)
 		  output.t2dm_cohort(in=inB keep=patid censordate aSAH_apc_dt);
 	by patid;
-	if inA and inP and inB;
-
+	if inA and inB;
+	earliest_rx_date = episode_start;  /* episode_start is the first Rx date of this AdhereR-bridged episode */
+	index_date = earliest_rx_date;
+	index_exposure = exposure;
 	end_of_fu = &study_end;
 
 	if not missing(censordate) and censordate < end_of_fu then end_of_fu = censordate;
@@ -178,18 +193,15 @@ data output.&cohort_label._episodes_fu;
 run;
 
 /**************************************************************************/
-/* STEP 2.0: Build 30-day intervals from index_date to end_of_fu          */
+/* STEP 2.0: Build 30-day intervals from THIS episode's own start to      */
+/* end_of_fu, for every episode row (not just each patient's first).      */
 /**************************************************************************/
 
-proc sort data = output.&cohort_label._episodes_fu nodupkey out = fu_onerow;
-by patid;
-run;
-
 data output.ThirtyDayIntervals_&cohort_label;
-	set fu_onerow;
+	set output.&cohort_label._episodes_fu;
 	by patid;
 
-	interval_window_start = index_date;
+	interval_window_start = episode_start;
 	do while (interval_window_start <= end_of_fu);
 		interval_window_end = min(interval_window_start + 29, end_of_fu);
 		output;
@@ -201,6 +213,8 @@ run;
 
 /**************************************************************************/
 /* STEP 2.1: Carry most-recent per-Rx dose (mg_value) into each interval  */
+/* (see header - not filtered to the patient's own index exposure, same   */
+/* limitation as tamsulosin/7_1's own equivalent step).                   */
 /**************************************************************************/
 
 proc sort data = output.all_&cohort_label._episodes
@@ -288,11 +302,17 @@ run;
 
 /**************************************************************************/
 /* STEP 2.2: Last coverage block starting on/before interval_window_start */
+/* Joined on exposure as well as patid: BridgeCoverage_&cohort_label      */
+/* (Step 0.1) now holds every episode of both drugs, so without the       */
+/* exposure match a patient who later used the other drug than the one    */
+/* that defines this row would incorrectly pick up that other drug's      */
+/* coverage as "last treatment".                                          */
 /**************************************************************************/
 
 proc sql;
 	create table output.IntervalCoverage_&cohort_label as
 	select i.patid,
+		   i.episode_ID,
 		   i.interval_window_start,
 		   i.interval_window_end,
 		   max(b.bridged_coverage_start) as last_coverage_period_start format=date9.,
@@ -300,30 +320,74 @@ proc sql;
 	from output.ThirtyDayIntervals_&cohort_label i
 		 left join output.BridgeCoverage_&cohort_label b
 			on i.patid = b.patid
+			and i.exposure = b.exposure
 			and b.bridged_coverage_start <= i.interval_window_start
-	group by i.patid, i.interval_window_start, i.interval_window_end
-	order by i.patid, i.interval_window_start;
+	group by i.patid, i.episode_ID, i.interval_window_start, i.interval_window_end
+	order by i.patid, i.episode_ID, i.interval_window_start;
 quit;
 
 /**************************************************************************/
+/* STEP 2.2b: Attach the time-varying dose (Step 2.1) and release pattern */
+/* (Step 2.1b) to each interval. Keyed on (patid, episode_ID,             */
+/* interval_window_start) - not just (patid, interval_window_start) -    */
+/* since a patient can now have more than one episode's worth of          */
+/* intervals in play, mirroring tamsulosin/7_1's equivalent step.         */
+/**************************************************************************/
+
+proc sort data = output.IntervalCoverage_&cohort_label; by patid episode_ID interval_window_start; run;
+
+proc sort data = output.IntervalDose_&cohort_label (keep = patid episode_ID interval_window_start mg_value_current)
+          out  = IntervalDose_sorted;
+	by patid episode_ID interval_window_start;
+run;
+
+proc sort data = output.IntervalRelease_&cohort_label (keep = patid episode_ID interval_window_start release_pattern_current)
+          out  = IntervalRelease_sorted;
+	by patid episode_ID interval_window_start;
+run;
+
+data output.IntervalCoverage_&cohort_label;
+	merge output.IntervalCoverage_&cohort_label (in=inC)
+	      IntervalDose_sorted                    (in=inD)
+	      IntervalRelease_sorted                 (in=inR);
+	by patid episode_ID interval_window_start;
+	if inC;
+run;
+
+/**************************************************************************/
 /* STEP 2.3: Classify recency (Current/Recent/Past) and flag aSAH        */
+/*                                                                          */
+/* Now computed per episode-row for whichever drug that episode is for -  */
+/* i.e. also for comparator episodes, not just the index drug's - so the  */
+/* R side (7_3_0) can cross this with the drug flag into a 6-level         */
+/* recency factor. See header comment (point 3).                          */
 /*                                                                          */
 /* Metformin protocol definition (different cutoff from tamsulosin):      */
 /*   Current = at least 1 day overlap with a treatment episode            */
 /*   Recent  = most recent episode ended <= 3 months (90 days) before     */
 /*             the start of this interval                                 */
 /*   Past    = most recent episode ended > 90 days before this interval  */
-/* (tamsulosin/7_1 uses a single 120-day cutoff for Recent/Past; this     */
-/* reuses that exact Current/Recent/Past structure, just changing the    */
-/* cutoff to 90 days per the metformin protocol.)                        */
+/* (tamsulosin/7_1 uses a single 120-day cutoff; this reuses that exact    */
+/* Current/Recent/Past structure, just changing the cutoff to 90 days     */
+/* per the metformin protocol.)                                           */
+/*                                                                          */
+/* output.&cohort_label._episodes_fu (built in Step 1.1) is one row per    */
+/* treatment episode, so the merge below is keyed on patid AND episode_ID  */
+/* - not patid alone - to avoid a many-to-many merge for patients with     */
+/* more than one episode.                                                  */
 /**************************************************************************/
+
+proc sort data = output.IntervalCoverage_&cohort_label; by patid episode_ID; run;
+
+proc sort data = output.&cohort_label._episodes_fu
+          out  = fu_keep (keep = patid episode_ID index_exposure index_date end_of_fu aSAH_apc_dt dose_category duration_category);
+by patid episode_ID;
+run;
 
 data output.&cohort_label._ot_all;
 	merge output.IntervalCoverage_&cohort_label(in=inI)
-	      output.IntervalDose_&cohort_label(in=inD keep=patid interval_window_start mg_value_current)
-	      output.IntervalRelease_&cohort_label(in=inR keep=patid interval_window_start release_pattern_current)
-	      fu_onerow(in=inO keep = patid index_exposure index_date end_of_fu aSAH_apc_dt dose_category duration_category);
-	by patid;
+	      fu_keep(in=inO);
+	by patid episode_ID;
 	if inI and inO;
 
 	if not missing(last_coverage_period_start) then do;
