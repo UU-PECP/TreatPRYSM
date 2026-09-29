@@ -1,5 +1,7 @@
 # Tamsulosin & aSAH — CPRD Aurum/HES APC pipeline
 
+Easy access to code now found at https://github.com/UU-PECP/TreatPRYSM/tree/claude/inspiring-lovelace-r9mii8
+
 The Treat-PRYSM project: a UK population-based cohort study of tamsulosin
 (an alpha-blocker) and risk of aneurysmal subarachnoid haemorrhage (aSAH),
 using linked CPRD Aurum primary-care and HES APC hospital-admission data.
@@ -175,3 +177,4 @@ scripts' origin as a separate, later addition to the pipeline.)*
 Run_All_TAMSULOSIN.sas                                orchestrates the full SAS pipeline (R stages run separately)
 RunAll_OT_only.sas                                    orchestrates just the on-treatment SAS steps (7_1, 7_2)
 ```
+This Readme File was made with the help of Claude. It may contain inaccuracies!

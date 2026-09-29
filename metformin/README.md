@@ -1,5 +1,7 @@
 # Metformin & aSAH — CPRD Aurum/HES APC pipeline
 
+Easy access to code now found at https://github.com/UU-PECP/TreatPRYSM/tree/claude/inspiring-lovelace-r9mii8
+
 Adapted from the `tamsulosin/` pipeline for the protocol *"The effect of Metformin
 use on risk of aneurysmal subarachnoid haemorrhage: A UK population-based cohort
 study"* (v5.0).
