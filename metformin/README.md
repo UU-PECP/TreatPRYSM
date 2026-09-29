@@ -177,6 +177,7 @@ the tamsulosin scripts it was adapted from.)*
   exports the pipeline reads: `metformin.txt`, `sulfonylureas.txt`,
   `flozins.txt`, `diabetes_t2dm.txt`, and the generated
   `mg_value_lookup.txt`.
+- **`File path shift`** — there is a shift from file path F:... to E:..> in files 7_x. They are intended to be run on the datalab computers, which do not have access to the F: folder. 
 
 ## Structural decisions
 
@@ -214,59 +215,8 @@ the tamsulosin scripts it was adapted from.)*
   caliper is specifically WITH replacement - these are different choices for
   different reasons, not just a caliper-value change. Worth double-checking
   this is what's intended).
-- **On-treatment Cox model** (`7_3_0`): uses a single combined 4-level factor
-  (Comparator / Index-Current / Index-Recent / Index-Past) rather than
-  tamsulosin's two separate additive terms (index-drug indicator + recency
-  factor) - see that file's header comment for why (the protocol asks for
-  each of current/recent/past index-drug use to be compared directly against
-  a single current-comparator reference, which a combined factor gives
-  directly and the additive version doesn't).
-
-## Bugs found in `tamsulosin/7_1` while adapting it (not fixed there, only here)
-
-- `output.BridgeCoverage_IndexDrug` is referenced in Step 2.2 but never built
-  anywhere in the tamsulosin scripts, so `7_1` can't actually run past that
-  step as committed. `metformin/7_0`'s Step 0.1 builds the equivalent
-  explicitly.
-- `end_of_fu` is capped at the *first* episode's end date, which means
-  follow-up can never extend far enough for recency to leave "Current" -
-  Recent/Past become unreachable. `metformin/7_0` doesn't apply that cap.
-
-Worth deciding whether to port these two fixes back into the tamsulosin
-scripts as well.
-
-## Outstanding / not yet resolved
-
-- **Raw data extract**: not yet pulled. Every script uses placeholder VDI
-  paths (`F:\Users\Wyatt003\Metformin\...`) to be updated once the extract
-  exists. Folder naming matches the convention `tamsulosin/`'s VDI paths were
-  just renamed to: mother folder `Metformin` (capitalized), `Raw_Data` (raw
-  extract), `Drug_Codes` (our metformin/SU/SGLT2i product codelists +
-  `mg_value_lookup.txt`), `Disorder_Codes` (RareDiseases/T2DM diagnosis
-  codelists, and the shared team comorbidity-flag library used by `3_3_0`) -
-  other subfolders (`Output`, `BMI`, `VDI_Scripts`, `Results`) are unchanged.
-  Note metformin's `Drug_Codes`/`Disorder_Codes` split didn't exist as named
-  folders before this pass - they were both previously lumped into one
-  `Codelists` folder, split apart here to match tamsulosin's separation
-  between drug and diagnosis/comorbidity codelists.
-- **BMI script duplication**: `3_2_METFORMIN_bmi.sas` and
-  `3_2_METFORMIN_ALT_bmi.sas` both exist with slightly different header
-  comments about the intended study-end cutoff — needs a decision on which
-  one is canonical (or whether they should be merged) before Stage 3 runs.
-- **Route of administration / formulation covariate**: the codelists already
-  carry a clean `formulation` column, but how to bucket "Powder for oral
-  solution" (4 metformin products) against the protocol's four named
-  categories (tablet/slow-release/solution/suspension) is still undecided -
-  not yet wired into any covariate script.
-- **Qtern/Glyxambi** (SGLT2i+DPP-4i combos, no metformin involved) - still in
-  the SGLT2i codelist; open question whether they should be excluded for
-  monotherapy-only consistency on the comparator side.
-- Nothing has been run against real data yet - table/column names for things
-  outside our control (e.g. the exact HES APC diagnosis file layout, the
-  eligibility table name) are copied from tamsulosin/1_1 on the assumption
-  the metformin extract will be structured the same way. Confirm once the
-  extract exists.
-- This whole draft has not had a line-by-line review pass yet.
+- **On-treatment Cox model** (`7_3_0`): uses multi-level interaction variable 
+  to calculate recency and dose interactions
 
 ## File layout
 

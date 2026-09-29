@@ -110,6 +110,8 @@ scripts' origin as a separate, later addition to the pipeline.)*
 
 ### Stage 7 — on-treatment analysis (SAS interval-building, then R Cox models)
 
+**NOTE: MUST BE RUN ON DATALAB COMPUTERS WITH AROUND 60GB OF RAM NEEDED**
+
 - **`7_1_tamsulosin_bph_on_treatment.sas`** — Builds interval-level
   on-treatment data from the treatment episodes: a **recency** flag
   (Current/Recent/Past, 120-day cutoff) and a **dose category**
@@ -133,7 +135,7 @@ scripts' origin as a separate, later addition to the pipeline.)*
   time-varying Cox with recency (as a separate additive term alongside the
   tamsulosin indicator) adjusted for time-varying BMI/smoking/age, and a
   secondary dose-sensitivity Cox model (Comparator / Current-Low /
-  Current-High dose, among intervals currently on tamsulosin).
+  Current-High dose, among intervals currently on tamsulosin). There is a transition from the F:... path to the E:... path for files, as the pipeline is built for use on the Datalab computer. 
 
 ### Orchestration
 
@@ -144,19 +146,6 @@ scripts' origin as a separate, later addition to the pipeline.)*
 - **`RunAll_OT_only.sas`** — A shorter orchestration covering just the
   on-treatment SAS steps, `7_1` then `7_2`, for re-running that stage alone
   once the rest of the pipeline's outputs already exist.
-
-## Known open issues
-
-- The `BridgeCoverage_IndexDrug` and `end_of_fu`-capping issues in `7_1`
-  described above (fixes exist in `metformin/7_0`, not yet ported here).
-- `3_1_bph_propensity_score_vars.sas` has an unresolved comment questioning
-  whether some tables should be referenced via the `codelist` libname or a
-  `codelis` typo/alias — worth checking against an actual run's log.
-- VDI file paths throughout point to `F:\Users\Wyatt003\Tamsulosin\...`,
-  except `7_1_tamsulosin_bph_on_treatment.sas`, whose `rawdata` libname was
-  manually changed to `E:\Tamsulosin\Raw_Data` — worth confirming this
-  drive-letter difference is intentional and that the rest of that file's
-  paths (e.g. its `Output` infile) are consistent with it.
 
 ## File layout
 
