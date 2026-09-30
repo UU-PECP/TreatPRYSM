@@ -3,10 +3,10 @@
 	September 28, 2021 */
 
 * Set Libraries;
-libname data       "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname medcode    "F:\Users\Wyatt003\BPH_nephrolithiasis\BMI";
-libname numunit    "F:\Users\Wyatt003\BPH_nephrolithiasis\BMI";
-libname output    "F:\Users\Wyatt003\BPH_nephrolithiasis\output";
+libname data       "F:\Users\Wyatt003\Tamsulosin\Raw_Data";
+libname medcode    "F:\Users\Wyatt003\Tamsulosin\BMI";
+libname numunit    "F:\Users\Wyatt003\Tamsulosin\BMI";
+libname output    "F:\Users\Wyatt003\Tamsulosin\output";
 
 * Required files: Observation File, smoking medcodes-units; 
 

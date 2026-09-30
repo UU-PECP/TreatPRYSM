@@ -1,82 +1,96 @@
-
-/*	Create BMI Variable  
-    Magdalena Gamba
-    September 29, 2021 */
+/*	Create BMI Variable
+    Originally by Magdalena Gamba, September 29, 2021
+    Reused unchanged for the metformin project (patid-level GP-derived
+    BMI - not drug or cohort specific). Shared by both the SU and
+    SGLT2i cohorts; the combine step (3_3) merges this in per cohort
+    using each cohort's own index date. */
 
 * Set Library Paths ;
-libname data       "F:\Users\Wyatt003\BPH_nephrolithiasis\SAS";
-libname medcode    "F:\Users\Wyatt003\BPH_nephrolithiasis\BMI";
-libname numunit    "F:\Users\Wyatt003\BPH_nephrolithiasis\BMI";
-libname output "F:\Users\Wyatt003\BPH_nephrolithiasis\Output";
+libname data       "F:\Users\Wyatt003\Metformin\Raw_Data";
+libname medcode    "F:\Users\Wyatt003\Metformin\BMI";
+libname numunit    "F:\Users\Wyatt003\Metformin\BMI";
+libname output "F:\Users\Wyatt003\Metformin\Output";
 
-* Required files: Observtion File, BMI-Weight-HeightMedcodeIDList,BMI-Weight-HeightNumunitIDList; 
+* Required files: Observtion File, BMI-Weight-HeightMedcodeIDList,BMI-Weight-HeightNumunitIDList;
 
-* Set value for cutoff date in Observation file; 
+* Set value for cutoff date in Observation file - overall database end
+  (same raw extract cutoff as tamsulosin, not either cohort's own
+  calendar window end);
 %let cutoff_date="31Mar2025"d;
 
 
-%macro BMI_obs (obs=, out=);
+%macro BMI_obs (obs=, out=, cohort=output.t2dm_cohort);
 
 * Read in files;
 * Observation File;
-data Observation (drop = pracid enterdate staffid parentobsid obstypeid numrangelow numrangehigh probobsid consid); 
-	set &obs. ;	
-	* Delete records with missing numunitid values; 
+/* Restrict to patids in the base T2DM cohort (built in 1_1) up front, via a
+   hash lookup, so this does not sort/scan BMI-code matches for every
+   patient in the raw extract - only patids that could ever reach 2_1/2_2s
+   exposure cohorts (which themselves inner join against &cohort.) survive. */
+data Observation (drop = pracid enterdate staffid parentobsid obstypeid numrangelow numrangehigh probobsid consid);
+	if _n_ = 1 then do;
+		declare hash cohort_ids(dataset: "&cohort.");
+		cohort_ids.definekey('patid');
+		cohort_ids.definedone();
+	end;
+	set &obs. ;
+	if cohort_ids.check() ne 0 then delete;
+	* Delete records with missing numunitid values;
 	if value eq . or value eq 0 then delete;
 	* Delete records whose dates are greater than the date of data extraction;
-	if obsdate  > &cutoff_date then delete;	
-run; 
+	if obsdate  > &cutoff_date then delete;
+run;
 
-* Remove duplicate data from observation file; 
+* Remove duplicate data from observation file;
 proc sort data = observation noduprecs;
 	by patid medcodeid obsid obsdate numunitid value;
 run;
 
-* BMI/Weight/Height related medcodeids (provided file); 
-* Contains a list of BMI/Weight/Height related medcodeIDs with their corresponding terms and classified into 3 measurement type groups: BMI, Weight and Height; 
-data BMIWtHtMedcodeIDList (drop = CleansedReadCode SnomedCTConceptID SnomedCTDescriptionID Release EmisCodeCategoryID OriginalReadCode); 
+* BMI/Weight/Height related medcodeids (provided file);
+* Contains a list of BMI/Weight/Height related medcodeIDs with their corresponding terms and classified into 3 measurement type groups: BMI, Weight and Height;
+data BMIWtHtMedcodeIDList (drop = CleansedReadCode SnomedCTConceptID SnomedCTDescriptionID Release EmisCodeCategoryID OriginalReadCode);
 	retain medcodeid term measurement_type;
 	set medcode.BMIWeightHeight_medcodes;
-run; 
+run;
 
-* BMI/Weight/Height related numunitids (provided file); 
+* BMI/Weight/Height related numunitids (provided file);
 * Contains a list of BMI/Weight/Height related numunitIDs with their corresponding description, classified into 3 measurement type groups: BMI, Weight and Height;
-data BMIWtHtNumunitIDList; 
+data BMIWtHtNumunitIDList;
 	set numunit.BMIWeightHeight_numunitcodes;
 run;
 
 * Merge Observation and BMIWtHtMedcodeIDList;
-proc sort data = observation; 
+proc sort data = observation;
 	by medcodeid;
-run; 
+run;
 
-proc sort data = BMIWtHtMedcodeIDList; 
+proc sort data = BMIWtHtMedcodeIDList;
 	by medcodeid;
-run; 
+run;
 
 * Merge Observation and Medcodeid files on medcodeid;
 data Observation_BMIWtHtMedcodeIDList;
 	merge observation (in = ina) BMIWtHtMedcodeIDList (in = inb);
 	by medcodeid;
 	if ina and inb;
-run; 
+run;
 
 
-* For records in Observation file with missing medcodeids -> use the numunitid file to filter out BMI-Weight-Height related records; 
+* For records in Observation file with missing medcodeids -> use the numunitid file to filter out BMI-Weight-Height related records;
 * Create a subset of records with missing medcodeids;
 data observation_medcodeid_missing;
 	set observation;
-	if medcodeid eq ""; 
-run; 
+	if medcodeid eq "";
+run;
 
 * Merge Observation data with missing medcodeids with the BMIWtHtNumunitIDList;
-proc sort data = observation_medcodeid_missing; 
+proc sort data = observation_medcodeid_missing;
 	by numunitid;
-run; 
+run;
 
-proc sort data = BMIWtHtNumunitIDList; 
+proc sort data = BMIWtHtNumunitIDList;
 	by numunitid;
-run; 
+run;
 
 data Observation_BMIWtHtNumunitIDList;
 	merge observation_medcodeid_missing (in = ina) BMIWtHtNumunitIDList (in = inb);
@@ -84,51 +98,52 @@ data Observation_BMIWtHtNumunitIDList;
 	if ina and inb;
 run;
 
-* Concatenate BMIWtHtMedcodeid Observation subset with BMIWtHtNumunitID Observation subset; 
+* Concatenate BMIWtHtMedcodeid Observation subset with BMIWtHtNumunitID Observation subset;
 data BMIWtHtRecords;
 	retain patid obsid obsdate medcodeid term numunitid value description measurement_type;
 	set Observation_BMIWtHtMedcodeIDList Observation_BMIWtHtNumunitIDList;
-run; 
+run;
 
-* Create 3 columns: BMI, WeightKG, HeightM 
-* For values in cm, convert to meters (for numunitIDs 122, 408 and 1863); 
+* Create 3 columns: BMI, WeightKG, HeightM
+* For values in cm, convert to meters (for numunitIDs 122, 408 and 1863);
 data BMIWtHtRecords_cols;
 	set BMIWtHtRecords;
 	if Measurement_type eq 'Body Mass Index' then BMI = value;
 	else if Measurement_type eq 'Weight' then WeightKG = value;
-	else if Measurement_type eq 'Height' and numunitid in (122, 408, 1863) then 
+	else if Measurement_type eq 'Height' and numunitid in (122, 408, 1863) then
 		do;
 			HeightM = value/100;
 			description = 'm';
 		end;
-	else HeightM = value; 
-run; 
+	else HeightM = value;
+run;
 
 * Create a subset of records with BMI values that fall withing a given min-max range (I chose minimum and maximum BMI values ever recorded in adults);
 * Drop duplicates i.e. same value from the same day;
-* Updated possible range based on Shahab's CPRD gold BMI script.
+/* Updated possible range based on Shahab's CPRD gold BMI script */
+
 data BMIEntered_WithinRange;
 	set BMIWtHtRecords_cols;
 	if BMI ne .;
 	if 12 =< BMI =< 70;
-run; 
+run;
 
-proc sort data = BMIEntered_WithinRange nodupkey; 
+proc sort data = BMIEntered_WithinRange nodupkey;
 	by patid obsdate BMI;
 run;
 
-* Create a subset of records with Weight values that fall within a given min-max range (I chose minimum and maximum Weight values ever recorded in adults); 
+* Create a subset of records with Weight values that fall within a given min-max range (I chose minimum and maximum Weight values ever recorded in adults);
 * Drop duplicates i.e. same value from the same day;
-* Count the number of weight values entered in each day per patient. If more than 1 then delete ; 
+* Count the number of weight values entered in each day per patient. If more than 1 then delete ;
 data WtEntered_WithinRange;
-	set BMIWtHtRecords_cols; 
+	set BMIWtHtRecords_cols;
 	if WeightKG ne .;
-	if 25 =< WeightKG =< 250; 
+	if 25 =< WeightKG =< 250;
 	* round up values;
 	WeightKG = round(WeightKG, 0.1);
-run; 
- 
-proc sort data = WtEntered_WithinRange nodupkey; 
+run;
+
+proc sort data = WtEntered_WithinRange nodupkey;
 	by patid obsdate WeightKG;
 run;
 
@@ -140,21 +155,21 @@ proc sql;
 quit;
 
 data WtEntered_WithinRange;
-	set WtEntered_WithinRange1; 
-	if wt_entries_ct > 1 then delete; 
-run; 
+	set WtEntered_WithinRange1;
+	if wt_entries_ct > 1 then delete;
+run;
 
-* Create a subset of records with Height values that fall within a given min-max range (I chose minimum and maximum Weight values ever recorded in adults); 
+* Create a subset of records with Height values that fall within a given min-max range (I chose minimum and maximum Weight values ever recorded in adults);
 * Drop duplicates i.e. same value from the same day;
-* Count the number of weight values entered in each day per patient. If more than 1 then delete ; 
-data HtEntered_WithinRange; 
-	set BMIWtHtRecords_cols; 
+* Count the number of weight values entered in each day per patient. If more than 1 then delete ;
+data HtEntered_WithinRange;
+	set BMIWtHtRecords_cols;
 	if HeightM ne .;
 	if 1 =< HeightM =< 2.5;
 	HeightM = round(HeightM, 0.01);
-run; 
+run;
 
-proc sort data = HtEntered_WithinRange nodupkey; 
+proc sort data = HtEntered_WithinRange nodupkey;
 	by patid obsdate HeightM;
 run;
 
@@ -166,18 +181,18 @@ proc sql;
 quit;
 
 data HtEntered_WithinRange;
-	set HtEntered_WithinRange1; 
-	if ht_entries_ct > 1 then delete; 
-run; 
+	set HtEntered_WithinRange1;
+	if ht_entries_ct > 1 then delete;
+run;
 
-* Concatenate weight and height records *; 
-data WtHtEntered_WithinRange (drop = wt_entries_ct ht_entries_ct value numunitid BMI); 
+* Concatenate weight and height records *;
+data WtHtEntered_WithinRange (drop = wt_entries_ct ht_entries_ct value numunitid BMI);
 	set WtEntered_WithinRange HtEntered_WithinRange;
-run; 
+run;
 
-proc sort data = WtHtEntered_WithinRange; 
+proc sort data = WtHtEntered_WithinRange;
 	by patid obsdate;
-run; 
+run;
 
 * Put height and weight on the same row for each patientid/date;
 data WtHtEntered_samerow;
@@ -186,9 +201,9 @@ data WtHtEntered_samerow;
   output;
 run;
 
-proc sort data = WtHtEntered_samerow; 
+proc sort data = WtHtEntered_samerow;
 	by patid obsdate descending HeightM;
-run; 
+run;
 
 data WtHtEntered_samerow1;
   update WtHtEntered_samerow(obs=0) WtHtEntered_samerow;
@@ -204,7 +219,7 @@ data WtHtEntered_samerow2;
 run;
 
 * Remove any duplicates;
-proc sort data = WtHtEntered_samerow2 nodupkey; 
+proc sort data = WtHtEntered_samerow2 nodupkey;
 	by patid obsdate WeightKG HeightM;
 run;
 
@@ -213,31 +228,31 @@ data BMICalculated_WithinRange;
 	set WtHtEntered_samerow2;
 	BMI_calc = round((WeightKG/(HeightM * HeightM)), 0.01);
 	if 7 =< BMI_calc =< 260;
-run; 
+run;
 
 * Clean Up!;
 proc delete data=work.Observation_BMIWtHtRecords_cols; run;
 proc delete data=work.Observation_bmiwthtnumunitidlist; run;
 
 * Concatenate records with BMI previously entered with those with BMI calculated;
-proc sort data = BMIEntered_WithinRange; 
+proc sort data = BMIEntered_WithinRange;
 	by patid obsdate;
-run; 
+run;
 
 proc sort data = BMICalculated_WithinRange;
-	by patid obsdate; 
-run; 
+	by patid obsdate;
+run;
 
-data BMI_both (drop = term numunitid value description measurement_type WeightKG HeightM); 
+data BMI_both (drop = term numunitid value description measurement_type WeightKG HeightM);
 	set BMIEntered_WithinRange BMICalculated_WithinRange;
 	by patid;
 	rename BMI = BMI_entered;
-run; 
+run;
 
 * Put BMI values (entered & calculated) on the same row per patient per obsdate);
 proc sort data = BMI_both;
 	by patid obsdate descending BMI_entered;
-run; 
+run;
 
 data BMI_both1;
   update BMI_both(obs=0) BMI_both;
@@ -247,7 +262,7 @@ run;
 
 proc sort data = BMI_both1;
 	by patid obsdate descending BMI_calc;
-run; 
+run;
 
 data BMI_both2;
   update BMI_both1(obs=0) BMI_both1;
@@ -256,7 +271,7 @@ data BMI_both2;
 run;
 
 * Remove any duplicates;
-proc sort data = BMI_both2 nodupkey; 
+proc sort data = BMI_both2 nodupkey;
 	by patid obsdate BMI_entered BMI_calc;
 run;
 
@@ -265,21 +280,12 @@ run;
 * If BMI is missing, then use the calculated BMI value;
 data &out (drop = BMI_entered BMI_calc);
 	set BMI_both2;
-	if BMI_entered ne . then BMI_final = BMI_entered; 
+	if BMI_entered ne . then BMI_final = BMI_entered;
 	if BMI_entered eq . and BMI_calc ne . then BMI_final = BMI_calc;
-run; 
+run;
 
 
 %mend BMI_obs;
-
-/* testing
-%BMI_obs (obs=output.clinical_TEST, out=output.bmi_all_test);
-proc datasets library = work kill nolist;
-run;
-quit;
-
-*/
-
 
 %BMI_obs (obs=data.observation_1, out=output.bmi_all_1);
 proc datasets library = work kill nolist;

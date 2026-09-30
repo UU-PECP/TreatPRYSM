@@ -34,4 +34,4 @@ density_plot  <- ggplot(fin_ref, aes(x = pscore, fill = factor(tamsulosin))) +
   scale_fill_manual(values = c("0" = "blue", "1" = "red"), labels = c("Non-User", "User"))
 
 print(density_plot)
-ggsave(density_plot, "F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Results\\densityplot_tam_fin_propscor")
+ggsave(density_plot, "F:\\Users\\Wyatt003\\Tamsulosin\\Results\\densityplot_tam_fin_propscor")

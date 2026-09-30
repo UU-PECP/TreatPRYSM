@@ -17,7 +17,7 @@ library(MatchThem)
 library(cobalt)
 
 #read the datasets
-df <- read.csv("F:\\Users\\Wyatt003\\BPH_nephrolithiasis\\Output\\bph_perprotocol.csv", colClasses = c(patid = "character"))
+df <- read.csv("F:\\Users\\Wyatt003\\Tamsulosin\\Output\\bph_perprotocol.csv", colClasses = c(patid = "character"))
 sapply(df, class)
 
 df %>% tabyl(exposure)
